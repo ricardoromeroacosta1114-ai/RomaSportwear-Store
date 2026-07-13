@@ -21,8 +21,11 @@ Tienda → agrega prendas (exige talla) → Carrito → método de entrega → C
 ## Variables de entorno necesarias
 Hoy: ninguna en Netlify. Solo `SUPABASE_URL` y `SUPABASE_ANON_KEY` dentro de `config.js` (la anon key es pública por diseño; la seguridad la dan las políticas RLS del SQL).
 
-## Qué falta para activar Mercado Pago
-1. Cuenta de Mercado Pago vendedor + credenciales (public key / access token).
-2. Un backend mínimo (Netlify Functions) que cree las preferencias de pago — el **access token es secreto** y NUNCA debe ir en el código del sitio ni en config.js; vivirá en variables de entorno de Netlify (Site settings → Environment variables: `MP_ACCESS_TOKEN`).
-3. Activar `mercadoPagoEnabled: true` en config y agregar el botón de pago al checkout.
-Cuando decidas activarlo, ese backend es un proyecto pequeño aparte.
+## Activar Mercado Pago (pago con tarjeta)
+El checkout y la función que crean la preferencia de pago (`netlify/functions/create-preference.js`) ya están implementados. Para activarlo:
+1. Consigue tu **Access Token** en el panel de Mercado Pago Developers (mercadopago.com.mx → Developers → Tus integraciones). Empieza con las credenciales de **prueba** antes que las de producción.
+2. En Netlify: Site settings → Environment variables → agrega `MP_ACCESS_TOKEN` (el token es secreto y NUNCA debe ir en el repo ni en `config.js`).
+3. Activa el checkbox "Activar pago con tarjeta (Mercado Pago)" en Administrador → Configuración de la tienda (o pon `mercadoPagoEnabled: true` en `config.js`).
+4. Prueba el flujo completo con una tarjeta de prueba antes de cambiar a credenciales de producción.
+
+Nota: la confirmación de pago se basa en los parámetros de la URL de retorno de Mercado Pago (`?mp=approved|pending|failure`), revisados junto con el aviso manual por WhatsApp antes de preparar el pedido. Para mayor robustez a futuro se puede agregar un webhook que verifique el pago directamente contra la API de Mercado Pago.

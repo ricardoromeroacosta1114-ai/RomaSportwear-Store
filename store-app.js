@@ -226,7 +226,7 @@ function go(v,param=null){ vista=v; vistaParam=param; render(); window.scrollTo(
 function render(){
   $("nav").innerHTML=NAV.map(([k,ic,l])=>`<button class="${vista===k?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join("");
   const V=Object.assign({home:viewHome,tienda:viewTienda,producto:viewProducto,armador:viewArmador,looks:viewLooks,
-    carrito:viewCarrito,checkout:viewCheckout,confirmacion:viewConfirmacion,perfil:viewPerfil,pedidos:viewPedidos}, window.EXTRA_VIEWS||{});
+    carrito:viewCarrito,checkout:viewCheckout,confirmacion:viewConfirmacion,pagoMP:viewPagoMP,perfil:viewPerfil,pedidos:viewPedidos}, window.EXTRA_VIEWS||{});
   $("views").innerHTML=`<div class="view">${(V[vista]||viewHome)()}</div>`;
   pintaBadge(false);
 }
@@ -668,8 +668,11 @@ function viewCheckout(){
         <b>Transferencia</b><small>Te enviamos los datos al confirmar</small></button>
       <button class="ent-opt ${pagoSel==='efectivo'?'on':''}" onclick="pagoSel='efectivo';DB.save('pago',pagoSel);render()">
         <b>Efectivo al recoger</b><small>Pagas al recibir tu pedido</small></button>
-      <button class="ent-opt" style="opacity:.45;pointer-events:none" aria-disabled="true">
-        <b>Pago con tarjeta</b><small>Próximamente</small></button>
+      ${C.mercadoPagoEnabled
+        ? `<button class="ent-opt ${pagoSel==='tarjeta'?'on':''}" onclick="pagoSel='tarjeta';DB.save('pago',pagoSel);render()">
+             <b>Pago con tarjeta</b><small>Vía Mercado Pago</small></button>`
+        : `<button class="ent-opt" style="opacity:.45;pointer-events:none" aria-disabled="true">
+             <b>Pago con tarjeta</b><small>Próximamente</small></button>`}
     </div>
     ${pagoSel==="transferencia"&&C.clabe?`<p style="font-size:12.5px;color:var(--gris);margin-top:10px">${C.bankName?C.bankName+" · ":""}${C.accountHolder?C.accountHolder+"<br>":""}CLABE: <b style="color:var(--tinta)">${C.clabe}</b></p>`:""}
   </div>
@@ -684,8 +687,8 @@ function viewCheckout(){
     <div class="tot-row"><span>Entrega</span><span>${T.envio===0?'Gratis':peso(T.envio)}</span></div>
     <div class="tot-row big"><span>Total</span><span>${peso(T.total)}</span></div>
   </div>
-  <p style="padding:0 22px;font-size:12px;color:var(--gris)">Al confirmar se abre WhatsApp con tu pedido armado — solo presiona enviar para que ROMA lo confirme.</p>
-  <div style="margin:14px 20px"><button class="btn-cart" style="width:100%" onclick="confirmarPedido()">Enviar pedido por WhatsApp</button></div>`;
+  <p style="padding:0 22px;font-size:12px;color:var(--gris)">${pagoSel==="tarjeta"?"Al confirmar te llevamos a Mercado Pago para pagar con tarjeta de forma segura.":"Al confirmar se abre WhatsApp con tu pedido armado — solo presiona enviar para que ROMA lo confirme."}</p>
+  <div style="margin:14px 20px"><button class="btn-cart" style="width:100%" onclick="confirmarPedido()">${pagoSel==="tarjeta"?"Pagar con tarjeta · "+peso(T.total):"Enviar pedido por WhatsApp"}</button></div>`;
 }
 function nuevoFolio(){
   const d=new Date();
@@ -710,7 +713,7 @@ function confirmarPedido(){
   const folio=nuevoFolio();
   const entTxt = entrega==="pickup" ? "Recoger personalmente ("+C.pickupAddress+")"
     : entrega==="local" ? "Entrega local en Mexicali" : "Envío nacional";
-  const pagoTxt = pagoSel==="transferencia"?"Transferencia":"Efectivo al recoger";
+  const pagoTxt = pagoSel==="transferencia"?"Transferencia":pagoSel==="tarjeta"?"Tarjeta (Mercado Pago)":"Efectivo al recoger";
   const L=[];
   L.push("🛍 *PEDIDO "+folio+"*","");
   L.push("*Cliente:* "+nombre);
@@ -733,12 +736,52 @@ function confirmarPedido(){
   const ganados=Math.floor(T.total/10);
   ordenes.unshift({folio,fecha:new Date().toISOString().slice(0,10),total:T.total,puntos:ganados,
     items:carrito.map(i=>{const {m,talla}=skuInfo(i.sku);return {n:m.nombre,c:m.color,t:talla,q:i.cant};}),
-    entrega,pago:pagoSel,estado:"Pendiente de enviar",texto});
+    entrega,pago:pagoSel,estado:pagoSel==="tarjeta"?"Pendiente de pago":"Pendiente de enviar",texto});
   DB.save("ordenes",ordenes);
   puntos+=ganados; DB.save("puntos",puntos);
   carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null);
+  if(pagoSel==="tarjeta"){ pagarConMP(folio,T.total); return; }
   navegaA("https://wa.me/"+C.whatsappNumber+"?text="+encodeURIComponent(texto));
   go("confirmacion",{folio,ganados});
+}
+async function pagarConMP(folio,total){
+  try{
+    const r=await fetch("/.netlify/functions/create-preference",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({folio,total})
+    });
+    const data=await r.json();
+    if(!r.ok||!data.init_point) throw new Error(data.error||"No se pudo iniciar el pago");
+    navegaA(data.init_point);
+  }catch(e){
+    toast("No se pudo iniciar el pago con tarjeta. Intenta de nuevo o elige otro método.");
+    go("checkout");
+  }
+}
+function procesaRetornoMP(){
+  const qs=new URLSearchParams(window.location.search);
+  const mp=qs.get("mp"), folio=qs.get("folio");
+  if(!mp||!folio) return;
+  const o=ordenes.find(x=>x.folio===folio);
+  if(o){ o.estado = mp==="approved"?"Pagado con tarjeta":mp==="pending"?"Pago pendiente":"Pago rechazado"; DB.save("ordenes",ordenes); }
+  vista="pagoMP"; vistaParam={folio,estado:mp};
+  history.replaceState(null,"",window.location.pathname);
+}
+function viewPagoMP(){
+  const p=vistaParam||{};
+  const ok=p.estado==="approved", pend=p.estado==="pending";
+  return `<div class="conf">
+    <div class="sello-ok">${ok?"✓":pend?"…":"✕"}</div>
+    <h2 class="serif">Pedido ${p.folio||""}</h2>
+    <p>${ok?'<b style="color:var(--tinta)">¡Pago con tarjeta aprobado!</b> Avísale a ROMA por WhatsApp para que prepare tu pedido.'
+        :pend?"Tu pago está pendiente de confirmación. Te avisaremos apenas se confirme."
+        :"El pago no se completó. Puedes intentarlo de nuevo o elegir otro método al pagar."}</p>
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:22px auto 0">
+      ${ok||pend?`<button class="btn-cart" onclick="navegaA(waDe('${p.folio}'))">Avisar por WhatsApp</button>`
+        :`<button class="btn-cart" onclick="go('carrito')">Volver al carrito</button>`}
+      <button class="btn-linea" onclick="go('home')">Volver al inicio</button>
+    </div>
+  </div>`;
 }
 function waDe(folio){
   const o=ordenes.find(x=>x.folio===folio); if(!o) return "#";
@@ -818,6 +861,30 @@ function viewPedidos(){
 
 function navegaA(url){ try{ window.location.href=url; }catch(e){} }
 
+/* ---------- instalación en iOS (Safari no ofrece prompt nativo) ---------- */
+function esIOSInstalable(){
+  const ua=navigator.userAgent||"";
+  const iOS=/iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const safari=/Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+  const standalone = window.navigator.standalone===true || window.matchMedia("(display-mode: standalone)").matches;
+  return iOS && safari && !standalone;
+}
+function pintaBannerInstalar(){
+  if($("bannerInstalar")) return;
+  if(!esIOSInstalable()) return;
+  if(Date.now() < DB.load("instalarOcultoHasta",0)) return;
+  document.body.insertAdjacentHTML("beforeend",
+    `<div id="bannerInstalar" style="position:fixed;left:12px;right:12px;bottom:78px;z-index:60;background:var(--tinta);color:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 22px rgba(0,0,0,.25)">
+      <span style="font-size:20px">📲</span>
+      <div style="flex:1;font-size:12.5px;line-height:1.35">Instala ROMA: toca <b>Compartir</b> ⬆ y luego <b>"Agregar a pantalla de inicio"</b></div>
+      <button onclick="cerrarBannerInstalar()" style="background:none;border:none;color:#fff;font-size:18px;line-height:1;padding:4px">✕</button>
+    </div>`);
+}
+function cerrarBannerInstalar(){
+  DB.save("instalarOcultoHasta", Date.now()+14*24*60*60*1000);
+  const b=$("bannerInstalar"); if(b) b.remove();
+}
+
 /* ---------- tema ---------- */
 function aplicaTema(){ document.documentElement.dataset.tema=tema==="oscuro"?"oscuro":"claro";
   const mt=document.querySelector('meta[name="theme-color"]'); if(mt) mt.content=tema==="oscuro"?"#12100D":"#FAF8F3"; }
@@ -829,12 +896,12 @@ function obNext(){
   if(i>=2){ finOnboard(); return; }
   t.scrollTo({left:(i+1)*t.clientWidth,behavior:"smooth"});
 }
-function finOnboard(){ DB.save("onboard",true); $("onboard").classList.remove("show"); $("app").classList.add("show"); render(); }
+function finOnboard(){ DB.save("onboard",true); $("onboard").classList.remove("show"); $("app").classList.add("show"); render(); pintaBannerInstalar(); }
 
 /* ---------- arranque ---------- */
 window.addEventListener("scroll",()=>{ $("topbar")&&$("topbar").classList.toggle("linea",window.scrollY>8); });
 document.addEventListener("DOMContentLoaded",()=>{
-  aplicaTema(); pintaWaFloat(); cargarCatalogo();
+  aplicaTema(); pintaWaFloat(); cargarCatalogo(); procesaRetornoMP();
   /* arte del onboarding */
   const ob1=$("obArt1"), ob2=$("obArt2");
   if(ob1) ob1.innerHTML=`<div style="position:relative;width:200px;height:200px">
@@ -855,7 +922,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     $("splash").classList.add("out");
     setTimeout(()=>{
       $("splash").style.display="none";
-      if(DB.load("onboard",false)){ $("app").classList.add("show"); render(); }
+      if(DB.load("onboard",false)){ $("app").classList.add("show"); render(); pintaBannerInstalar(); }
       else $("onboard").classList.add("show");
     },430);
   },1500);

@@ -87,16 +87,19 @@ function viewAdminPanel(){
     ${admCampo("clabe","CLABE",C.clabe)}
     ${admCampo("instagram","Instagram (URL)",C.instagram)}
     ${admCampo("facebook","Facebook (URL)",C.facebook)}
+    ${admCheck("mercadoPagoEnabled","Activar pago con tarjeta (Mercado Pago)",C.mercadoPagoEnabled)}
     <button class="btn-cart" style="width:100%;margin-top:6px" onclick="adminGuardaCfg()">Guardar configuración</button>
-    <p style="font-size:11.5px;color:var(--gris);margin-top:10px">Mercado Pago: preparado pero desactivado. Ver README-ADMIN.md — las llaves NUNCA van en este panel ni en el código del sitio.</p>
+    <p style="font-size:11.5px;color:var(--gris);margin-top:10px">Para que el pago con tarjeta funcione, además de activarlo aquí debe existir la variable de entorno MP_ACCESS_TOKEN en Netlify. Ver README-ADMIN.md — las llaves NUNCA van en este panel ni en el código del sitio.</p>
   </div>`;
 }
 function admCampo(k,label,val,tipo){ return `<div class="field"><label>${label}</label><input data-cfg="${k}" type="${tipo||"text"}" value="${val==null?"":String(val).replace(/"/g,"&quot;")}"></div>`; }
+function admCheck(k,label,val){ return `<div class="field" style="display:flex;align-items:center;gap:8px"><input data-cfg="${k}" type="checkbox" ${val?"checked":""} style="width:auto"><label style="margin:0">${label}</label></div>`; }
 window.adminGuardaCfg=async function(){
   const o={};
   document.querySelectorAll("[data-cfg]").forEach(i=>{
     const k=i.dataset.cfg; let v=i.value;
-    if(i.type==="number") v=parseFloat(v)||0;
+    if(i.type==="checkbox") v=i.checked;
+    else if(i.type==="number") v=parseFloat(v)||0;
     o[k]=v;
   });
   const {error}=await sb.from("config").upsert({id:1,datos:o});
