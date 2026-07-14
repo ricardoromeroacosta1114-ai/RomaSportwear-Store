@@ -5,7 +5,7 @@
    ============================================================ */
 (function(){
 "use strict";
-let sesion=null, prodEdit=null, subiendo=false;
+let sesion=null, prodEdit=null, subiendo=false, promoEdit=null;
 
 async function checaSesion(){ if(!window.sb) return null;
   try{ const {data}=await sb.auth.getSession(); sesion=data.session; return sesion; }catch(e){ return null; }
@@ -59,8 +59,22 @@ async function cargaAdmProds(){
   const {data,error}=await sb.from("productos").select("*").order("orden",{ascending:true}).order("creado",{ascending:true});
   if(!error) admProds=data||[];
 }
+let admPromos=[];
+async function cargaAdmPromos(){
+  const {data,error}=await sb.from("promos").select("*").order("creado",{ascending:true});
+  if(!error) admPromos=data||[];
+}
+function admPromosListaHtml(){
+  if(!admPromos.length) return `<p style="font-size:13px;color:var(--gris)">Aún no hay códigos promocionales.</p>`;
+  return admPromos.map(p=>`<div style="display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--linea)">
+    <div style="flex:1;min-width:0"><b style="font-size:13.5px">${p.codigo}</b>
+      <br><small style="color:var(--gris)">${p.descripcion||""} · ${p.activo?"ACTIVO":"apagado"}</small></div>
+    <button class="mini-btn sec2" onclick="adminEditaPromo('${p.codigo}')">Editar</button>
+  </div>`).join("");
+}
 function viewAdminPanel(){
   cargaAdmProds().then(()=>{ const el=document.getElementById("admLista"); if(el) el.innerHTML=admListaHtml(); });
+  cargaAdmPromos().then(()=>{ const el=document.getElementById("admListaPromos"); if(el) el.innerHTML=admPromosListaHtml(); });
   const C=CFG();
   return `
   <div class="back-row"><button onclick="go('perfil')">← Salir de la vista</button>
@@ -71,6 +85,20 @@ function viewAdminPanel(){
     <h4>Productos</h4>
     <button class="btn-cart" style="width:100%;margin-bottom:12px" onclick="adminNuevoProd()">+ Agregar producto</button>
     <div id="admLista">${admListaHtml()}</div>
+  </div>
+
+  <div class="panel">
+    <h4>Códigos promocionales</h4>
+    <button class="btn-cart" style="width:100%;margin-bottom:12px" onclick="adminNuevoPromo()">+ Agregar código</button>
+    <div id="admListaPromos">${admPromosListaHtml()}</div>
+    <p style="font-size:11.5px;color:var(--gris);margin-top:8px">Apagados por defecto — solo las clientas ven los que actives aquí.</p>
+  </div>
+
+  <div class="panel">
+    <h4>Puntos y niveles</h4>
+    ${admCheck("puntosEnabled","Activar programa de puntos y niveles",C.puntosEnabled)}
+    ${admCampo("oroDiscountPct","% descuento automático nivel Oro (500+ pts)",C.oroDiscountPct,"number")}
+    ${admCampo("eliteDiscountPct","% descuento automático nivel Élite (1,500+ pts)",C.eliteDiscountPct,"number")}
   </div>
 
   <div class="panel">
@@ -237,7 +265,60 @@ window.adminBorraProd=async function(){
   toast("Producto eliminado"); await cargaAdmProds(); adoptaCatalogo(admProds); go("admin");
 };
 
+/* ---------- VISTA: editor de código promocional ---------- */
+window.adminNuevoPromo=function(){ promoEdit={codigo:"",tipo:"pct",valor:10,minimo:null,vence:"",descripcion:"",activo:false}; go("adminPromo"); };
+window.adminEditaPromo=function(codigo){ promoEdit=JSON.parse(JSON.stringify(admPromos.find(p=>p.codigo===codigo))); go("adminPromo"); };
+
+function viewAdminPromo(){
+  if(!sesion||!promoEdit) return viewAdmin();
+  const p=promoEdit;
+  const esNuevo=!admPromos.some(x=>x.codigo===p.codigo);
+  return `
+  <div class="back-row"><button onclick="go('admin')">← Códigos</button></div>
+  <h2 class="titulo serif">${esNuevo?"Nuevo":"Editar"} código</h2>
+  <div class="panel">
+    <div class="field"><label>Código</label><input id="pmCodigo" value="${p.codigo}" ${esNuevo?"":"disabled"} placeholder="EJ. ROMA10" style="text-transform:uppercase"></div>
+    <div class="field"><label>Tipo de descuento</label><select id="pmTipo" class="f-sel" style="width:100%;border-radius:14px;padding:13px" onchange="promoEdit.tipo=this.value;render()">
+      ${[["pct","% sobre el subtotal"],["fijo","Monto fijo ($)"],["envio","Envío gratis"]].map(([k,v])=>`<option value="${k}" ${p.tipo===k?"selected":""}>${v}</option>`).join("")}</select></div>
+    ${p.tipo!=="envio"?`<div class="field"><label>${p.tipo==="pct"?"Porcentaje (%)":"Monto ($)"}</label><input id="pmValor" type="number" value="${p.valor||0}"></div>`:""}
+    <div class="field"><label>Compra mínima ($, opcional)</label><input id="pmMinimo" type="number" value="${p.minimo||""}"></div>
+    <div class="field"><label>Vence (opcional)</label><input id="pmVence" type="date" value="${p.vence||""}"></div>
+    <div class="field"><label>Descripción (se muestra a la clienta)</label><input id="pmDesc" value="${(p.descripcion||"").replace(/"/g,"&quot;")}"></div>
+    <div class="field" style="display:flex;align-items:center;gap:8px"><input id="pmActivo" type="checkbox" ${p.activo?"checked":""} style="width:auto"><label style="margin:0">Código activo</label></div>
+  </div>
+  <div style="margin:6px 20px 20px;display:flex;flex-direction:column;gap:10px">
+    <button class="btn-cart" onclick="adminGuardaPromo()">Guardar código</button>
+    ${esNuevo?"":`<button class="btn-linea" style="color:var(--rojo);border-color:var(--rojo)" onclick="adminBorraPromo()">Eliminar código</button>`}
+  </div>`;
+}
+window.adminGuardaPromo=async function(){
+  const g=id=>document.getElementById(id).value;
+  const codigo=g("pmCodigo").trim().toUpperCase();
+  if(!codigo){ toast("Falta el código"); return; }
+  const fila={
+    codigo, tipo:g("pmTipo"),
+    valor: g("pmTipo")==="envio" ? null : (parseFloat(g("pmValor"))||0),
+    minimo: parseFloat(g("pmMinimo"))||null,
+    vence: g("pmVence")||null,
+    descripcion: g("pmDesc").trim(),
+    activo: document.getElementById("pmActivo").checked
+  };
+  const esNuevo=!admPromos.some(x=>x.codigo===promoEdit.codigo);
+  const {error}= esNuevo
+    ? await sb.from("promos").insert(fila)
+    : await sb.from("promos").update(fila).eq("codigo",promoEdit.codigo);
+  if(error){ toast("No se pudo guardar: "+error.message); return; }
+  toast("Código guardado");
+  await cargaAdmPromos(); await cargaPromos(); go("admin");
+};
+window.adminBorraPromo=async function(){
+  if(!confirm("¿Eliminar este código promocional?")) return;
+  const {error}=await sb.from("promos").delete().eq("codigo",promoEdit.codigo);
+  if(error){ toast("No se pudo eliminar: "+error.message); return; }
+  toast("Código eliminado"); await cargaAdmPromos(); await cargaPromos(); go("admin");
+};
+
 /* registrar vistas en el router de la tienda */
-window.EXTRA_VIEWS = { admin:viewAdmin, adminProd:viewAdminProd };
+window.EXTRA_VIEWS = { admin:viewAdmin, adminProd:viewAdminProd, adminPromo:viewAdminPromo };
 checaSesion();
 })();

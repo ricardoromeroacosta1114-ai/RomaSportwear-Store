@@ -7,12 +7,11 @@
 let CFG_OVR = (function(){ try{return JSON.parse(localStorage.getItem("romastore_cfg")||"{}");}catch(e){return {};} })();
 function CFG(){ return Object.assign({}, ROMA_CONFIG, CFG_OVR); }
 function setCfgOverrides(o){ CFG_OVR=o||{}; try{localStorage.setItem("romastore_cfg",JSON.stringify(CFG_OVR));}catch(e){} }
-const CODIGOS = {
-  ROMA10:      { tipo:"pct",   valor:10, desc:"10% de descuento en tu compra" },
-  BIENVENIDA:  { tipo:"fijo",  valor:50, min:300, desc:"$50 de regalo en compras desde $300" },
-  ENVIOGRATIS: { tipo:"envio", desc:"Envío gratis en tu pedido" },
-  LOOK15:      { tipo:"look",  get valor(){return CFG().outfitDiscountPct;}, get desc(){return CFG().outfitDiscountPct+"% al llevar el look completo (arriba + abajo)";} },
-  VERANO25:    { tipo:"pct",   valor:25, vence:"2026-06-30", desc:"25% — promoción de verano" }
+/* Los códigos "generales" (ROMA10, BIENVENIDA, etc.) ya no viven aquí — se administran
+   desde el panel Admin y se cargan de la tabla `promos` en Supabase (apagados por defecto).
+   LOOK15 sigue especial: está ligado al armador de outfits y a outfitDiscountPct. */
+let CODIGOS = {
+  LOOK15: { tipo:"look", get valor(){return CFG().outfitDiscountPct;}, get desc(){return CFG().outfitDiscountPct+"% al llevar el look completo (arriba + abajo)";} }
 };
 /* ============================================================ */
 
@@ -125,6 +124,22 @@ async function cargarCatalogo(){
     if(cfg.data&&cfg.data.datos){ setCfgOverrides(cfg.data.datos); render(); pintaWaFloat(); }
   }catch(e){}
 }
+function adoptaPromos(rows){
+  const activos={};
+  (rows||[]).filter(r=>r.activo===true).forEach(r=>{
+    activos[r.codigo]={tipo:r.tipo, valor:r.valor, min:r.minimo, vence:r.vence, desc:r.descripcion};
+  });
+  CODIGOS={LOOK15:CODIGOS.LOOK15, ...activos};
+  try{localStorage.setItem("romastore_promos",JSON.stringify(rows));}catch(e){}
+}
+async function cargaPromos(){
+  try{ const cache=JSON.parse(localStorage.getItem("romastore_promos")||"null"); if(cache) adoptaPromos(cache); }catch(e){}
+  if(!window.sb) return;
+  try{
+    const {data,error}=await sb.from("promos").select("*");
+    if(!error&&data){ adoptaPromos(data); render(); }
+  }catch(e){}
+}
 function pintaWaFloat(){ const a=document.getElementById("waFloat"); if(a) a.href="https://wa.me/"+CFG().whatsappNumber; }
 
 /* ---------- estado / persistencia ---------- */
@@ -214,6 +229,14 @@ function totales(){
     }
   }
   const C=CFG();
+  if(C.puntosEnabled!==false){
+    const nivel=nivelDe(puntos)[0];
+    const nivelPct = nivel==="Élite"?(C.eliteDiscountPct||0) : nivel==="Oro"?(C.oroDiscountPct||0) : 0;
+    if(nivelPct>0){
+      const descNivel=sub*nivelPct/100;
+      if(descNivel>desc){ desc=descNivel; etiqueta="Nivel "+nivel; }
+    }
+  }
   const costoBase = entrega==="pickup" ? 0 : entrega==="nacional" ? C.nationalShippingCost : C.localDeliveryCost;
   const gratis = envioGratisCod || (C.freeShippingFrom>0 && (sub-desc)>=C.freeShippingFrom);
   let envio = (sub>0 && !gratis) ? costoBase : 0;
@@ -811,15 +834,20 @@ function viewConfirmacion(){
 /* ============ PERFIL ============ */
 function nivelDe(p){ return p>=1500?["Élite",1500,3000]:p>=500?["Oro",500,1500]:["Bronce",0,500]; }
 function viewPerfil(){
+  const C=CFG();
   const [niv,base,tope]=nivelDe(puntos);
   const pct=Math.min(100,Math.round((puntos-base)/(tope-base)*100));
+  const beneficioTxt = niv==="Élite" ? `Tu beneficio: ${C.eliteDiscountPct||0}% de descuento automático en cada compra.`
+    : niv==="Oro" ? `Tu beneficio: ${C.oroDiscountPct||0}% de descuento automático en cada compra.`
+    : `Al llegar a Oro (500 pts) desbloqueas ${C.oroDiscountPct||0}% de descuento automático; en Élite (1,500 pts), ${C.eliteDiscountPct||0}%.`;
   return `<h2 class="titulo serif">${perfil.nombre?("Hola, "+perfil.nombre.split(" ")[0]):"Tu perfil"}</h2>
-  <div class="nivel-card">
+  ${C.puntosEnabled===false?"":`<div class="nivel-card">
     <div class="eyebrow">Nivel ${niv}</div>
     <h3 class="serif">${puntos} puntos ✦</h3>
-    <p>${tope-puntos>0?`${tope-puntos} puntos para el siguiente nivel — 1 punto por cada $10 de compra.`:"Nivel máximo. Acceso anticipado a drops."}</p>
+    <p>${beneficioTxt}</p>
+    <p style="margin-top:4px">${tope-puntos>0?`${tope-puntos} puntos para el siguiente nivel — 1 punto por cada $10 de compra.`:"Nivel máximo."}</p>
     <div class="nivel-bar"><div style="width:${pct}%"></div></div>
-  </div>
+  </div>`}
   <div class="panel" style="margin-top:4px">
     <h4>Tus datos</h4>
     <div class="field"><label>Nombre</label><input id="pfNombre" value="${perfil.nombre||""}" placeholder="Tu nombre"></div>
@@ -901,7 +929,7 @@ function finOnboard(){ DB.save("onboard",true); $("onboard").classList.remove("s
 /* ---------- arranque ---------- */
 window.addEventListener("scroll",()=>{ $("topbar")&&$("topbar").classList.toggle("linea",window.scrollY>8); });
 document.addEventListener("DOMContentLoaded",()=>{
-  aplicaTema(); pintaWaFloat(); cargarCatalogo(); procesaRetornoMP();
+  aplicaTema(); pintaWaFloat(); cargarCatalogo(); cargaPromos(); procesaRetornoMP();
   /* arte del onboarding */
   const ob1=$("obArt1"), ob2=$("obArt2");
   if(ob1) ob1.innerHTML=`<div style="position:relative;width:200px;height:200px">

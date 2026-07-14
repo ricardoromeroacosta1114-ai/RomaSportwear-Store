@@ -33,9 +33,28 @@ create table if not exists public.config (
 insert into public.config (id, datos) values (1, '{}'::jsonb)
   on conflict (id) do nothing;
 
+-- Tabla de códigos promocionales (apagados por defecto — el admin los activa)
+create table if not exists public.promos (
+  codigo text primary key,          -- ej. "ROMA10", siempre en mayúsculas
+  tipo text not null default 'pct', -- pct | fijo | envio
+  valor numeric,                    -- % o monto fijo (null si tipo=envio)
+  minimo numeric,                   -- compra mínima requerida (opcional)
+  vence date,                       -- fecha de vencimiento (opcional)
+  descripcion text default '',
+  activo boolean default false,
+  creado timestamptz default now()
+);
+insert into public.promos (codigo,tipo,valor,minimo,vence,descripcion,activo) values
+  ('ROMA10','pct',10,null,null,'10% de descuento en tu compra',false),
+  ('BIENVENIDA','fijo',50,300,null,'$50 de regalo en compras desde $300',false),
+  ('ENVIOGRATIS','envio',null,null,null,'Envío gratis en tu pedido',false),
+  ('VERANO25','pct',25,null,'2026-06-30','25% — promoción de verano',false)
+on conflict (codigo) do nothing;
+
 -- Seguridad (RLS): lectura pública, escritura solo con sesión de administrador
 alter table public.productos enable row level security;
 alter table public.config enable row level security;
+alter table public.promos enable row level security;
 
 drop policy if exists "productos_lectura_publica" on public.productos;
 create policy "productos_lectura_publica" on public.productos
@@ -52,6 +71,15 @@ create policy "config_lectura_publica" on public.config
 
 drop policy if exists "config_escritura_admin" on public.config;
 create policy "config_escritura_admin" on public.config
+  for all using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
+
+drop policy if exists "promos_lectura_publica" on public.promos;
+create policy "promos_lectura_publica" on public.promos
+  for select using (true);
+
+drop policy if exists "promos_escritura_admin" on public.promos;
+create policy "promos_escritura_admin" on public.promos
   for all using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 
