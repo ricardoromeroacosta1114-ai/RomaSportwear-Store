@@ -18,7 +18,7 @@ const ROMA_CONFIG = {
   schedule: "Lun–Sáb 10:00–20:00",
   instagram: "",
   facebook: "",
-  mercadoPagoEnabled: false,          // NO activar aún — ver README-ADMIN
+  mercadoPagoEnabled: true,           // ACTIVO — token en Netlify (MP_ACCESS_TOKEN)
   puntosEnabled: true,                // programa de puntos y niveles (Bronce/Oro/Élite)
   oroDiscountPct: 5,                  // % descuento automático nivel Oro (500+ pts)
   eliteDiscountPct: 10                // % descuento automático nivel Élite (1500+ pts)
