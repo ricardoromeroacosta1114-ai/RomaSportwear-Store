@@ -46,7 +46,13 @@ exports.handler = async (event) => {
     if (!r.ok) {
       return { statusCode: 502, body: JSON.stringify({ error: data.message || "Mercado Pago rechazó la solicitud" }) };
     }
-    return { statusCode: 200, body: JSON.stringify({ init_point: data.init_point }) };
+    /* live_mode indica si el token es de produccion (true) o de prueba (false).
+       Sirve para diagnosticar el error "una de las partes es de prueba". */
+    return { statusCode: 200, body: JSON.stringify({
+      init_point: data.init_point,
+      live_mode: data.live_mode,
+      collector_id: data.collector_id
+    }) };
   } catch (e) {
     return { statusCode: 502, body: JSON.stringify({ error: "No se pudo contactar a Mercado Pago" }) };
   }
