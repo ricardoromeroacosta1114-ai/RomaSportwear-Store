@@ -918,40 +918,15 @@ function aplicaTema(){ document.documentElement.dataset.tema=tema==="oscuro"?"os
   const mt=document.querySelector('meta[name="theme-color"]'); if(mt) mt.content=tema==="oscuro"?"#12100D":"#FAF8F3"; }
 function toggleTema(){ tema=tema==="claro"?"oscuro":"claro"; DB.save("tema",tema); aplicaTema(); render(); }
 
-/* ---------- onboarding ---------- */
-function obNext(){
-  const t=$("obTrack"); const i=Math.round(t.scrollLeft/t.clientWidth);
-  if(i>=2){ finOnboard(); return; }
-  t.scrollTo({left:(i+1)*t.clientWidth,behavior:"smooth"});
-}
-function finOnboard(){ DB.save("onboard",true); $("onboard").classList.remove("show"); $("app").classList.add("show"); render(); pintaBannerInstalar(); }
-
 /* ---------- arranque ---------- */
 window.addEventListener("scroll",()=>{ $("topbar")&&$("topbar").classList.toggle("linea",window.scrollY>8); });
 document.addEventListener("DOMContentLoaded",()=>{
   aplicaTema(); pintaWaFloat(); cargarCatalogo(); cargaPromos(); procesaRetornoMP();
-  /* arte del onboarding */
-  const ob1=$("obArt1"), ob2=$("obArt2");
-  if(ob1) ob1.innerHTML=`<div style="position:relative;width:200px;height:200px">
-    <div style="position:absolute;left:6px;top:14px;transform:rotate(-8deg)">${svgPrenda("playera","Beige",120)}</div>
-    <div style="position:absolute;right:6px;top:52px;transform:rotate(7deg)">${svgPrenda("recto","Cafe",140)}</div></div>`;
-  if(ob2) ob2.innerHTML=`<div style="position:relative;width:200px;height:200px">
-    <div style="position:absolute;left:0;top:26px;transform:rotate(-9deg)">${svgPrenda("chamarra","Negro",115)}</div>
-    <div style="position:absolute;left:66px;top:8px">${svgPrenda("playera","Azul Lago",112)}</div>
-    <div style="position:absolute;right:0;top:48px;transform:rotate(8deg)">${svgPrenda("campana","Azul Oscuro",145)}</div></div>`;
-  const track=$("obTrack");
-  if(track) track.addEventListener("scroll",()=>{
-    const i=Math.round(track.scrollLeft/track.clientWidth);
-    document.querySelectorAll(".ob-dot").forEach((d,j)=>d.classList.toggle("on",j===i));
-    const btn=document.querySelector(".ob-foot .mini-btn"); if(btn) btn.textContent=i>=2?"Empezar":"Siguiente";
-  },{passive:true});
-
   setTimeout(()=>{
     $("splash").classList.add("out");
     setTimeout(()=>{
       $("splash").style.display="none";
-      if(DB.load("onboard",false)){ $("app").classList.add("show"); render(); pintaBannerInstalar(); }
-      else $("onboard").classList.add("show");
+      $("app").classList.add("show"); render(); pintaBannerInstalar();
     },430);
   },1500);
 });

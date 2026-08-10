@@ -48,21 +48,6 @@ img,svg{display:block}
 #splash.out{animation:splashOut .45s ease forwards}
 @keyframes splashOut{to{opacity:0;visibility:hidden}}
 
-/* ================= ONBOARDING ================= */
-#onboard{position:fixed;inset:0;background:var(--papel);z-index:150;display:none;flex-direction:column}
-#onboard.show{display:flex}
-.ob-track{flex:1;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
-.ob-track::-webkit-scrollbar{display:none}
-.ob-slide{min-width:100%;scroll-snap-align:center;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;padding:40px 34px;text-align:center;gap:22px}
-.ob-art{width:210px;height:210px;display:flex;align-items:center;justify-content:center}
-.ob-slide h2{font-size:32px;line-height:1.15;font-weight:600}
-.ob-slide p{color:var(--gris);max-width:300px;font-size:14.5px}
-.ob-foot{padding:18px 26px calc(22px + var(--safe-b));display:flex;align-items:center;justify-content:space-between}
-.ob-dots{display:flex;gap:7px}
-.ob-dot{width:7px;height:7px;border-radius:50%;background:var(--linea);transition:.3s}
-.ob-dot.on{background:var(--oro);width:20px;border-radius:4px}
-
 /* ================= APP SHELL ================= */
 #app{display:none;min-height:100%;padding-bottom:calc(76px + var(--safe-b))}
 #app.show{display:block}
@@ -347,31 +332,6 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 <div id="splash">
   <div class="marca serif" style="font-size:38px;letter-spacing:10px;font-weight:700">R<em style="color:var(--oro);font-style:normal">O</em>MA</div>
   <div class="sub">SPORTSWEAR</div>
-</div>
-
-<div id="onboard">
-  <div class="ob-track" id="obTrack">
-    <div class="ob-slide">
-      <div class="ob-art" id="obArt1"></div>
-      <h2 class="serif">No compres una prenda.<br>Arma el look.</h2>
-      <p>ROMA sugiere con qué combinar cada pieza para que salgas con el outfit completo.</p>
-    </div>
-    <div class="ob-slide">
-      <div class="ob-art" id="obArt2"></div>
-      <h2 class="serif">Tu armador<br>de outfits.</h2>
-      <p>Elige arriba, abajo y tu capa. Ve cómo combinan, guárdalo en Mis Looks y agrégalo al carrito en un tap.</p>
-    </div>
-    <div class="ob-slide">
-      <div class="ob-art" style="font-size:64px">🏷️</div>
-      <h2 class="serif">El look completo<br>tiene premio.</h2>
-      <p>15% de descuento al llevarte el outfit completo, y puntos ROMA en cada compra.</p>
-    </div>
-  </div>
-  <div class="ob-foot">
-    <button style="color:var(--gris);font-weight:600;font-size:13px" onclick="finOnboard()">Saltar</button>
-    <div class="ob-dots"><div class="ob-dot on"></div><div class="ob-dot"></div><div class="ob-dot"></div></div>
-    <button class="mini-btn" onclick="obNext()">Siguiente</button>
-  </div>
 </div>
 
 <div id="app">
