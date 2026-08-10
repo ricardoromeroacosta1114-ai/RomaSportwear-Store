@@ -44,10 +44,11 @@ img,svg{display:block}
   flex-direction:column;align-items:center;justify-content:center;gap:13px}
 #splash .sp-logo{width:164px;opacity:0;transform:scale(.74);
   animation:spLogo .8s cubic-bezier(.22,1,.36,1) .05s forwards}
-#splash .sp-logo img{width:100%;height:auto;display:block}
-#splash .logo-dark{display:none}
-html[data-tema="oscuro"] #splash .logo-light{display:none}
-html[data-tema="oscuro"] #splash .logo-dark{display:block}
+#splash .sp-logo img{width:100%;height:auto}
+#splash img.logo-light{display:block}
+#splash img.logo-dark{display:none}
+html[data-tema="oscuro"] #splash img.logo-light{display:none}
+html[data-tema="oscuro"] #splash img.logo-dark{display:block}
 #splash .marca{opacity:0;transform:translateY(9px);animation:spUp .6s cubic-bezier(.22,1,.36,1) .45s forwards}
 #splash .sp-linea{width:0;height:2px;border-radius:2px;background:var(--oro);
   animation:spLinea .5s cubic-bezier(.22,1,.36,1) .65s forwards}
