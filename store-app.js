@@ -761,11 +761,21 @@ function confirmarPedido(){
     items:carrito.map(i=>{const {m,talla}=skuInfo(i.sku);return {n:m.nombre,c:m.color,t:talla,q:i.cant};}),
     entrega,pago:pagoSel,estado:pagoSel==="tarjeta"?"Pendiente de pago":"Pendiente de enviar",texto});
   DB.save("ordenes",ordenes);
-  puntos+=ganados; DB.save("puntos",puntos);
-  carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null);
+  /* Con tarjeta todavia no sabemos si el pago se aprueba: conservamos el carrito
+     y los puntos hasta que Mercado Pago responda (ver cierraPedido). Asi, si la
+     tarjeta se rechaza, la clienta vuelve con su seleccion intacta. */
   if(pagoSel==="tarjeta"){ pagarConMP(folio,T.total); return; }
+  cierraPedido(folio);
   navegaA("https://wa.me/"+C.whatsappNumber+"?text="+encodeURIComponent(texto));
   go("confirmacion",{folio,ganados});
+}
+/* Cierra el pedido: otorga los puntos y vacia el carrito. Solo se llama cuando
+   el pedido quedo en firme (WhatsApp/transferencia, o tarjeta aprobada). */
+function cierraPedido(folio){
+  const o=ordenes.find(x=>x.folio===folio);
+  if(o && !o.puntosAplicados){ puntos+=(o.puntos||0); o.puntosAplicados=true;
+    DB.save("puntos",puntos); DB.save("ordenes",ordenes); }
+  carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null);
 }
 async function pagarConMP(folio,total){
   try{
@@ -787,6 +797,11 @@ function procesaRetornoMP(){
   if(!mp||!folio) return;
   const o=ordenes.find(x=>x.folio===folio);
   if(o){ o.estado = mp==="approved"?"Pagado con tarjeta":mp==="pending"?"Pago pendiente":"Pago rechazado"; DB.save("ordenes",ordenes); }
+  /* Aprobado: se otorgan los puntos y se vacia el carrito.
+     Pendiente: el pago sigue en curso, vaciamos el carrito pero sin dar puntos.
+     Rechazado: no se toca nada — el carrito sigue intacto para reintentar. */
+  if(mp==="approved") cierraPedido(folio);
+  else if(mp==="pending"){ carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null); }
   vista="pagoMP"; vistaParam={folio,estado:mp};
   history.replaceState(null,"",window.location.pathname);
 }
@@ -798,7 +813,7 @@ function viewPagoMP(){
     <h2 class="serif">Pedido ${p.folio||""}</h2>
     <p>${ok?'<b style="color:var(--tinta)">¡Pago con tarjeta aprobado!</b> Avísale a ROMA por WhatsApp para que prepare tu pedido.'
         :pend?"Tu pago está pendiente de confirmación. Te avisaremos apenas se confirme."
-        :"El pago no se completó. Puedes intentarlo de nuevo o elegir otro método al pagar."}</p>
+        :'El pago no se completó. <b style="color:var(--tinta)">Tu carrito sigue intacto</b> — puedes intentar con otra tarjeta o elegir otro método de pago.'}</p>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:22px auto 0">
       ${ok||pend?`<button class="btn-cart" onclick="navegaA(waDe('${p.folio}'))">Avisar por WhatsApp</button>`
         :`<button class="btn-cart" onclick="go('carrito')">Volver al carrito</button>`}
