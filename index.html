@@ -169,18 +169,21 @@ nav.bar button.on::after{content:"";width:4px;height:4px;border-radius:50%;backg
   appearance:none;-webkit-appearance:none}
 
 /* ================= FICHA PRODUCTO ================= */
+/* La altura se limita con vh para que el selector de talla quede a la vista
+   sin tener que deslizar, incluso en celulares chicos. */
 .ficha-fig{margin:8px 20px 0;border-radius:26px;background:var(--papel2);aspect-ratio:4/4.6;
-  display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.ficha-fig svg{width:62%;height:auto;filter:drop-shadow(0 22px 26px rgba(20,18,16,.2));
+  max-height:36vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+@media (min-height:800px){ .ficha-fig{max-height:42vh} }
+.ficha-fig svg{width:62%;height:auto;max-height:88%;filter:drop-shadow(0 22px 26px rgba(20,18,16,.2));
   transition:transform .35s cubic-bezier(.22,1,.36,1)}
 .ficha-fig.zoom svg{transform:scale(1.5)}
 .zoom-hint{position:absolute;bottom:12px;right:14px;font-size:10.5px;color:var(--gris);
   background:color-mix(in srgb,var(--blanco) 80%,transparent);padding:5px 10px;border-radius:100px;backdrop-filter:blur(6px)}
-.ficha-body{padding:18px 20px 8px}
-.ficha-body h1{font-size:30px;font-weight:600;line-height:1.1}
+.ficha-body{padding:12px 20px 8px}
+.ficha-body h1{font-size:25px;font-weight:600;line-height:1.1}
 .estrellas{color:var(--oro);letter-spacing:2px;font-size:13px}
 .opt-label{font-size:11px;letter-spacing:2px;font-weight:700;color:var(--gris);
-  text-transform:uppercase;margin:18px 0 9px}
+  text-transform:uppercase;margin:12px 0 7px}
 .swatches{display:flex;gap:10px;flex-wrap:wrap}
 .sw{width:34px;height:34px;border-radius:50%;border:2px solid var(--linea);position:relative;transition:.2s}
 .sw.on{border-color:var(--oro);transform:scale(1.12);box-shadow:0 0 0 3px var(--oro-tenue)}
