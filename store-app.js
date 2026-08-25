@@ -16,39 +16,9 @@ let CODIGOS = {
 /* ============================================================ */
 
 /* ---------- inventario (sincronizado del POS) ---------- */
-const INV = [
-{sku:"ROM-CHAM-NEG-S",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Negro",talla:"S",precio:250,stock:2},{sku:"ROM-CHAM-NEG-M",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Negro",talla:"M",precio:250,stock:2},{sku:"ROM-CHAM-NEG-L",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Negro",talla:"L",precio:250,stock:2},
-{sku:"ROM-CHAM-BLA-S",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Blanco",talla:"S",precio:250,stock:1},{sku:"ROM-CHAM-BLA-M",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Blanco",talla:"M",precio:250,stock:2},{sku:"ROM-CHAM-BLA-L",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Blanco",talla:"L",precio:250,stock:1},
-{sku:"ROM-CHAM-AZO-S",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Azul Oscuro",talla:"S",precio:250,stock:1},{sku:"ROM-CHAM-AZO-M",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Azul Oscuro",talla:"M",precio:250,stock:1},{sku:"ROM-CHAM-AZO-L",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Azul Oscuro",talla:"L",precio:250,stock:1},
-{sku:"ROM-CHAM-CAF-M",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Cafe",talla:"M",precio:250,stock:1},{sku:"ROM-CHAM-CAF-L",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Cafe",talla:"L",precio:250,stock:1},
-{sku:"ROM-CHAM-AZL-M",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Azul Lago",talla:"M",precio:250,stock:1},{sku:"ROM-CHAM-AZL-L",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Azul Lago",talla:"L",precio:250,stock:1},
-{sku:"ROM-CHAM-ROB-S",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Rosa",talla:"S",precio:250,stock:1},{sku:"ROM-CHAM-ROB-M",nombre:"Chamarra Deportiva",cat:"Chamarras",color:"Rosa",talla:"M",precio:250,stock:1},
-{sku:"ROM-TUBITO-NEG-S",nombre:"Leggings Tubito",cat:"Leggings",color:"Negro",talla:"S",precio:200,stock:2},{sku:"ROM-TUBITO-NEG-M",nombre:"Leggings Tubito",cat:"Leggings",color:"Negro",talla:"M",precio:200,stock:2},{sku:"ROM-TUBITO-NEG-L",nombre:"Leggings Tubito",cat:"Leggings",color:"Negro",talla:"L",precio:200,stock:2},
-{sku:"ROM-TUBITO-AZO-S",nombre:"Leggings Tubito",cat:"Leggings",color:"Azul Oscuro",talla:"S",precio:200,stock:1},{sku:"ROM-TUBITO-AZO-M",nombre:"Leggings Tubito",cat:"Leggings",color:"Azul Oscuro",talla:"M",precio:200,stock:1},{sku:"ROM-TUBITO-AZO-L",nombre:"Leggings Tubito",cat:"Leggings",color:"Azul Oscuro",talla:"L",precio:200,stock:1},
-{sku:"ROM-TUBITO-CAF-S",nombre:"Leggings Tubito",cat:"Leggings",color:"Cafe",talla:"S",precio:200,stock:1},{sku:"ROM-TUBITO-CAF-M",nombre:"Leggings Tubito",cat:"Leggings",color:"Cafe",talla:"M",precio:200,stock:1},{sku:"ROM-TUBITO-CAF-L",nombre:"Leggings Tubito",cat:"Leggings",color:"Cafe",talla:"L",precio:200,stock:1},
-{sku:"ROM-TUBITO-MOR-S",nombre:"Leggings Tubito",cat:"Leggings",color:"Morado",talla:"S",precio:200,stock:1},{sku:"ROM-TUBITO-MOR-M",nombre:"Leggings Tubito",cat:"Leggings",color:"Morado",talla:"M",precio:200,stock:1},
-{sku:"ROM-TUBITO-AZL-M",nombre:"Leggings Tubito",cat:"Leggings",color:"Azul Lago",talla:"M",precio:200,stock:1},
-{sku:"ROM-TUBITO-CAC-M",nombre:"Leggings Tubito",cat:"Leggings",color:"Cacao",talla:"M",precio:200,stock:1},
-{sku:"ROM-CAMPANA-NEG-S",nombre:"Leggings Campana",cat:"Leggings",color:"Negro",talla:"S",precio:280,stock:2},{sku:"ROM-CAMPANA-NEG-M",nombre:"Leggings Campana",cat:"Leggings",color:"Negro",talla:"M",precio:280,stock:2},{sku:"ROM-CAMPANA-NEG-L",nombre:"Leggings Campana",cat:"Leggings",color:"Negro",talla:"L",precio:280,stock:2},
-{sku:"ROM-CAMPANA-CAF-S",nombre:"Leggings Campana",cat:"Leggings",color:"Cafe",talla:"S",precio:280,stock:1},{sku:"ROM-CAMPANA-CAF-M",nombre:"Leggings Campana",cat:"Leggings",color:"Cafe",talla:"M",precio:280,stock:1},{sku:"ROM-CAMPANA-CAF-L",nombre:"Leggings Campana",cat:"Leggings",color:"Cafe",talla:"L",precio:280,stock:1},
-{sku:"ROM-CAMPANA-AZO-S",nombre:"Leggings Campana",cat:"Leggings",color:"Azul Oscuro",talla:"S",precio:280,stock:1},{sku:"ROM-CAMPANA-AZO-M",nombre:"Leggings Campana",cat:"Leggings",color:"Azul Oscuro",talla:"M",precio:280,stock:1},{sku:"ROM-CAMPANA-AZO-L",nombre:"Leggings Campana",cat:"Leggings",color:"Azul Oscuro",talla:"L",precio:280,stock:1},
-{sku:"ROM-CAMPANA-CAC-S",nombre:"Leggings Campana",cat:"Leggings",color:"Cacao",talla:"S",precio:280,stock:1},{sku:"ROM-CAMPANA-CAC-M",nombre:"Leggings Campana",cat:"Leggings",color:"Cacao",talla:"M",precio:280,stock:1},{sku:"ROM-CAMPANA-CAC-L",nombre:"Leggings Campana",cat:"Leggings",color:"Cacao",talla:"L",precio:280,stock:1},
-{sku:"ROM-PLAYERA-NEG-S",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Negro",talla:"S",precio:150,stock:1},{sku:"ROM-PLAYERA-NEG-M",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Negro",talla:"M",precio:150,stock:1},{sku:"ROM-PLAYERA-NEG-L",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Negro",talla:"L",precio:150,stock:1},
-{sku:"ROM-PLAYERA-MAR-S",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Beige",talla:"S",precio:150,stock:1},
-{sku:"ROM-PLAYERA-AMA-S",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Amarillo",talla:"S",precio:150,stock:1},
-{sku:"ROM-PLAYERA-AZO-M",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Azul Oscuro",talla:"M",precio:150,stock:1},
-{sku:"ROM-PLAYERA-ROS-M",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Rosa",talla:"M",precio:150,stock:1},
-{sku:"ROM-PLAYERA-AZL-L",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Azul Lago",talla:"L",precio:150,stock:1},
-{sku:"ROM-PLAYERA-ROJ-L",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Guinda",talla:"L",precio:150,stock:1},
-{sku:"ROM-PLAYERA-MOR-L",nombre:"Playera Dry-Fit",cat:"Playeras",color:"Morado",talla:"L",precio:150,stock:1},
-{sku:"ROM-RECTO-NEG-S",nombre:"Leggings Recto",cat:"Leggings",color:"Negro",talla:"S",precio:300,stock:12},{sku:"ROM-RECTO-NEG-M",nombre:"Leggings Recto",cat:"Leggings",color:"Negro",talla:"M",precio:300,stock:18},{sku:"ROM-RECTO-NEG-L",nombre:"Leggings Recto",cat:"Leggings",color:"Negro",talla:"L",precio:300,stock:18},
-{sku:"ROM-RECTO-MAR-S",nombre:"Leggings Recto",cat:"Leggings",color:"Beige",talla:"S",precio:300,stock:3},{sku:"ROM-RECTO-MAR-M",nombre:"Leggings Recto",cat:"Leggings",color:"Beige",talla:"M",precio:300,stock:5},{sku:"ROM-RECTO-MAR-L",nombre:"Leggings Recto",cat:"Leggings",color:"Beige",talla:"L",precio:300,stock:4},
-{sku:"ROM-RECTO-CAF-S",nombre:"Leggings Recto",cat:"Leggings",color:"Cafe",talla:"S",precio:300,stock:5},{sku:"ROM-RECTO-CAF-M",nombre:"Leggings Recto",cat:"Leggings",color:"Cafe",talla:"M",precio:300,stock:8},{sku:"ROM-RECTO-CAF-L",nombre:"Leggings Recto",cat:"Leggings",color:"Cafe",talla:"L",precio:300,stock:7}
-];
+/* INV, NUEVO y OFERTA se cargan desde catalogo.js (generado de data/catalogo.json) */
 
 /* metadatos de escaparate (editable): novedades y ofertas */
-const NUEVO = ["Leggings Recto","Chamarra Deportiva"];
-const OFERTA = { "Leggings Tubito":240, "Playera Dry-Fit":180 }; // precio anterior tachado
 
 /* ---------- modelos agrupados (nombre+color) ---------- */
 function slug(s){return s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g,"-");}
@@ -166,18 +136,24 @@ const $ = id=>document.getElementById(id);
 const peso = n=>"$"+(Math.round(n*100)/100).toLocaleString("es-MX",{minimumFractionDigits:2});
 function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove("on"),2200); }
 
-/* ---------- reseñas seed ---------- */
-const RESENAS_POOL=[
- ["Karla M.","La tela es de otra calidad, no se transparenta nada. Segunda compra."],
- ["Fernanda R.","Me encantó el corte, estiliza muchísimo. Llegó rápido en Mexicali."],
- ["Alexa T.","Talla fiel. El color es igualito al de la foto del look."],
- ["Dany G.","Lo compré con el outfit completo por el 15% y valió toda la pena."],
- ["Marifer L.","Súper cómodo para el gym y para salir. Quiero más colores."]
-];
-function resenasDe(id){ let h=0; for(const ch of id) h=(h*31+ch.charCodeAt(0))>>>0;
-  const n=2+(h%2); const out=[]; for(let i=0;i<n;i++) out.push(RESENAS_POOL[(h+i*2)%RESENAS_POOL.length]);
-  return {items:out, rating:(4.6+((h%4)/10)).toFixed(1)};
+/* ---------- reseñas ----------
+   Solo se muestran reseñas verificadas de clientas reales.
+   Cuando exista la tabla 'resenas' en Supabase se leerán de ahí;
+   mientras tanto no se inventa ninguna ni se muestra calificación. */
+function resenasDe(id){
+  const todas = (window.RESENAS_VERIFICADAS||[]).filter(r=>r.producto===id);
+  return { items: todas, rating: null, total: todas.length };
 }
+
+/* El acceso de administrador no se muestra a las clientas.
+   Se activa entrando una vez a la tienda con ?admin=1 */
+const ADMIN_VISIBLE=(function(){
+  try{
+    if(/[?&]admin=1/.test(location.search)){ localStorage.setItem("romastore_admin","1"); return true; }
+    if(/[?&]admin=0/.test(location.search)){ localStorage.removeItem("romastore_admin"); return false; }
+    return localStorage.getItem("romastore_admin")==="1";
+  }catch(e){ return false; }
+})();
 
 /* ---------- carrito helpers ---------- */
 const skuInfo = sku => { for(const m of MODELOS) for(const [t,v] of Object.entries(m.tallas)) if(v.sku===sku) return {m,talla:t,stock:v.stock}; return null; };
@@ -295,7 +271,7 @@ function viewHome(){
   <section class="hero">
     <div class="eyebrow">Mexicali · Nueva colección</div>
     <h1 class="serif">El look<br>completo.</h1>
-    <p>No vendemos prendas sueltas. Armamos outfits que se sienten tuyos.</p>
+    <p>Compra por prenda o combina tu look completo con Roma.</p>
     <button class="btn-oro" onclick="go('armador')"><span class="fl">✦</span> Arma tu outfit</button>
   </section>
   <div class="chips">${cats.map(c=>`<button class="chip ${catFiltro===c?'on':''}" onclick="catFiltro='${c}';go('tienda')">${c}</button>`).join("")}</div>
@@ -375,7 +351,7 @@ function viewProducto(){
       <span style="font-size:20px;font-weight:700">${peso(mSel.precio)}</span>
       ${mSel.antes?`<s style="color:var(--gris)">${peso(mSel.antes)}</s>`:""}
       <span style="flex:1"></span>
-      <span class="estrellas">★★★★★</span><b style="font-size:13px">${rs.rating}</b>
+      ${rs.total?`<span class="estrellas">★★★★★</span><b style="font-size:13px">${rs.total} reseña${rs.total===1?"":"s"}</b>`:""}
     </div>
 
     <div class="opt-label">Color · ${colorSel}</div>
@@ -412,7 +388,7 @@ function viewProducto(){
 
   <div class="ficha-body">
     <div class="opt-label">Reseñas</div>
-    ${rs.items.map(([n,t])=>`<div class="resena"><span class="estrellas" style="font-size:11px">★★★★★</span><b> ${n}</b><p>${t}</p></div>`).join("")}
+    ${rs.items.length ? rs.items.map(r=>`<div class="resena"><span class="estrellas" style="font-size:11px">${"★".repeat(r.estrellas||5)}</span><b> ${r.nombre}</b><p>${r.texto}</p></div>`).join("") : `<p style="font-size:13px;color:var(--gris)">Todavía no hay reseñas verificadas de esta prenda. Cuando la compres y nos cuentes tu experiencia, aparecerá aquí.</p>`}
   </div>`;
 }
 function sugerencias(m){
@@ -697,7 +673,7 @@ function viewCheckout(){
         : `<button class="ent-opt" style="opacity:.45;pointer-events:none" aria-disabled="true">
              <b>Pago con tarjeta</b><small>Próximamente</small></button>`}
     </div>
-    ${pagoSel==="transferencia"&&C.clabe?`<p style="font-size:12.5px;color:var(--gris);margin-top:10px">${C.bankName?C.bankName+" · ":""}${C.accountHolder?C.accountHolder+"<br>":""}CLABE: <b style="color:var(--tinta)">${C.clabe}</b></p>`:""}
+    ${pagoSel==="transferencia"?`<p style="font-size:12.5px;color:var(--gris);margin-top:10px">Al confirmar tu pedido te mostramos los datos para transferir y te los enviamos por WhatsApp.</p>`:""}
   </div>
   <div class="panel">
     <h4>Notas adicionales</h4>
@@ -764,7 +740,7 @@ function confirmarPedido(){
   /* Con tarjeta todavia no sabemos si el pago se aprueba: conservamos el carrito
      y los puntos hasta que Mercado Pago responda (ver cierraPedido). Asi, si la
      tarjeta se rechaza, la clienta vuelve con su seleccion intacta. */
-  if(pagoSel==="tarjeta"){ pagarConMP(folio,T.total); return; }
+  if(pagoSel==="tarjeta"){ pagarConMP(folio,T.total,carrito.map(i=>({sku:i.sku,cant:i.cant})),entrega); return; }
   cierraPedido(folio);
   navegaA("https://wa.me/"+C.whatsappNumber+"?text="+encodeURIComponent(texto));
   go("confirmacion",{folio,ganados});
@@ -777,19 +753,25 @@ function cierraPedido(folio){
     DB.save("puntos",puntos); DB.save("ordenes",ordenes); }
   carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null);
 }
-async function pagarConMP(folio,total){
+async function pagarConMP(folio,total,items,entregaSel){
   try{
     const r=await fetch("/.netlify/functions/create-preference",{
       method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({folio,total})
+      body:JSON.stringify({folio, items, entrega:entregaSel, codigo:codigoAplicado,
+        nivelPct: CFG().puntosEnabled===false?0:nivelPctActual()})
     });
     const data=await r.json();
     if(!r.ok||!data.init_point) throw new Error(data.error||"No se pudo iniciar el pago");
     navegaA(data.init_point);
   }catch(e){
-    toast("No se pudo iniciar el pago con tarjeta. Intenta de nuevo o elige otro método.");
+    toast(e.message||"No se pudo iniciar el pago con tarjeta. Intenta de nuevo o elige otro método.");
     go("checkout");
   }
+}
+/* % de descuento por nivel; el servidor lo recorta al maximo real de la tienda */
+function nivelPctActual(){
+  const C=CFG(), niv=nivelDe(puntos)[0];
+  return niv==="Élite"?(C.eliteDiscountPct||0) : niv==="Oro"?(C.oroDiscountPct||0) : 0;
 }
 function procesaRetornoMP(){
   const qs=new URLSearchParams(window.location.search);
@@ -821,6 +803,22 @@ function viewPagoMP(){
     </div>
   </div>`;
 }
+/* Datos bancarios: solo aparecen aqui, con el pedido ya generado (regla 8). */
+function datosTransferencia(folio){
+  const o=ordenes.find(x=>x.folio===folio); if(!o||o.pago!=="transferencia") return "";
+  const C=CFG(); if(!C.clabe) return "";
+  const fila=(et,val)=>val?("<p style=\"font-size:13px;margin:2px 0\">"+et+": <b style=\"color:var(--tinta)\">"+val+"</b></p>"):"";
+  return "<div class=\"panel\" style=\"text-align:left;max-width:320px;margin:18px auto 0\">"+
+    "<h4>Para completar tu pago</h4>"+
+    "<p style=\"font-size:13px;color:var(--gris);margin:0 0 6px\">Transfiere "+peso(o.total)+" y mándanos el comprobante por WhatsApp.</p>"+
+    fila("Banco",C.bankName)+fila("A nombre de",C.accountHolder)+fila("CLABE",C.clabe)+
+    "<button class=\"mini-btn sec2\" style=\"margin-top:8px\" onclick=\"copiarClabe()\">⧉ Copiar CLABE</button>"+
+  "</div>";
+}
+async function copiarClabe(){
+  try{ await navigator.clipboard.writeText(CFG().clabe||""); toast("CLABE copiada"); }
+  catch(e){ toast("No se pudo copiar"); }
+}
 function waDe(folio){
   const o=ordenes.find(x=>x.folio===folio); if(!o) return "#";
   return "https://wa.me/"+CFG().whatsappNumber+"?text="+encodeURIComponent(o.texto||"");
@@ -841,6 +839,7 @@ function viewConfirmacion(){
       <button class="btn-cart" onclick="navegaA(waDe('${p.folio}'))">Abrir WhatsApp con mi pedido</button>
       <button class="btn-linea" onclick="copiarPedido('${p.folio}')">⧉ Copiar pedido</button>
     </div>
+    ${datosTransferencia(p.folio)}
     <p style="margin-top:12px;color:var(--oro);font-weight:700">+${p.ganados} puntos ROMA ✦</p>
     <button class="btn-oro" style="margin-top:20px" onclick="go('home')">Volver al inicio</button>
   </div>`;
@@ -872,7 +871,7 @@ function viewPerfil(){
   <button class="perfil-item" onclick="go('pedidos')"><span class="ic">▤</span> Mis pedidos <small>${ordenes.length}</small></button>
   <button class="perfil-item" onclick="go('looks')"><span class="ic">♡</span> Mis looks guardados <small>${looks.length}</small></button>
   <button class="perfil-item" onclick="verPromos()"><span class="ic">🏷</span> Mis promociones disponibles</button>
-  <button class="perfil-item" onclick="go('admin')"><span class="ic">🔒</span> Administrador ROMA</button>
+  ${ADMIN_VISIBLE?`<button class="perfil-item" onclick="go('admin')"><span class="ic">🔒</span> Administrador ROMA</button>`:""}
   <button class="perfil-item" onclick="toggleTema()"><span class="ic">◐</span> Modo ${tema==="claro"?"oscuro":"claro"}</button>`;
 }
 function verPromos(){

@@ -1,38 +1,54 @@
 /* Crea una preferencia de pago (Checkout Pro) en Mercado Pago.
-   El Access Token vive solo en la variable de entorno MP_ACCESS_TOKEN de Netlify. */
+   El Access Token vive solo en la variable de entorno MP_ACCESS_TOKEN.
+   El total NO se acepta del navegador: se recalcula aqui a partir del
+   catalogo y de la configuracion de la tienda. */
+const { leeConfig, validaItems, calcula } = require("./_tienda");
+
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ error: "Método no permitido" }) };
+    return json(405, { error: "Método no permitido" });
   }
 
   let body;
   try { body = JSON.parse(event.body || "{}"); }
-  catch (e) { return { statusCode: 400, body: JSON.stringify({ error: "JSON inválido" }) }; }
+  catch (e) { return json(400, { error: "JSON inválido" }); }
 
-  const { folio, total } = body;
-  if (!folio || !(Number(total) > 0)) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Falta folio o total" }) };
+  const { folio, items, entrega, codigo, nivelPct } = body;
+  if (!folio || typeof folio !== "string" || folio.length > 40) {
+    return json(400, { error: "Folio no válido" });
   }
+
+  const v = validaItems(items);
+  if (!v.ok) return json(409, { error: v.error });
+
+  const cfg = await leeConfig();
+  const t = calcula(v.items, entrega, cfg, { codigo, nivelPct });
+  if (!(t.total > 0)) return json(409, { error: "El total del pedido no es válido" });
 
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Mercado Pago no está configurado (falta MP_ACCESS_TOKEN en Netlify)" }) };
+    return json(503, { error: "El pago con tarjeta no está disponible por ahora. Elige otro método." });
   }
 
   const siteUrl = process.env.URL || ("https://" + event.headers.host);
+  const volver = est => siteUrl + "/?mp=" + est + "&folio=" + encodeURIComponent(folio);
+
+  /* Se mandan los renglones reales para que la clienta vea su desglose en
+     Mercado Pago; el descuento y el envio van como renglones aparte. */
+  const mpItems = v.items.map(i => ({
+    title: i.nombre + " " + i.color + " · Talla " + i.talla,
+    quantity: i.cant,
+    unit_price: i.precio,
+    currency_id: "MXN"
+  }));
+  if (t.desc > 0) mpItems.push({ title: "Descuento " + (t.etiqueta || ""), quantity: 1, unit_price: -t.desc, currency_id: "MXN" });
+  if (t.envio > 0) mpItems.push({ title: "Envío", quantity: 1, unit_price: t.envio, currency_id: "MXN" });
+
   const preference = {
-    items: [{
-      title: "Pedido ROMA Sportwear #" + folio,
-      quantity: 1,
-      unit_price: Number(total),
-      currency_id: "MXN"
-    }],
+    items: mpItems,
     external_reference: folio,
-    back_urls: {
-      success: siteUrl + "/?mp=approved&folio=" + encodeURIComponent(folio),
-      failure: siteUrl + "/?mp=failure&folio=" + encodeURIComponent(folio),
-      pending: siteUrl + "/?mp=pending&folio=" + encodeURIComponent(folio)
-    },
+    statement_descriptor: "ROMA SPORTWEAR",
+    back_urls: { success: volver("approved"), failure: volver("failure"), pending: volver("pending") },
     auto_return: "approved"
   };
 
@@ -43,17 +59,17 @@ exports.handler = async (event) => {
       body: JSON.stringify(preference)
     });
     const data = await r.json();
-    if (!r.ok) {
-      return { statusCode: 502, body: JSON.stringify({ error: data.message || "Mercado Pago rechazó la solicitud" }) };
+    if (!r.ok || !data.init_point) {
+      console.error("MP rechazo la preferencia:", r.status, data && data.message);
+      return json(502, { error: "Mercado Pago no pudo iniciar el pago. Intenta de nuevo." });
     }
-    /* live_mode indica si el token es de produccion (true) o de prueba (false).
-       Sirve para diagnosticar el error "una de las partes es de prueba". */
-    return { statusCode: 200, body: JSON.stringify({
-      init_point: data.init_point,
-      live_mode: data.live_mode,
-      collector_id: data.collector_id
-    }) };
+    return json(200, { init_point: data.init_point, total: t.total });
   } catch (e) {
-    return { statusCode: 502, body: JSON.stringify({ error: "No se pudo contactar a Mercado Pago" }) };
+    console.error("Error contactando MP:", e.message);
+    return json(502, { error: "No se pudo contactar a Mercado Pago" });
   }
 };
+
+function json(statusCode, obj) {
+  return { statusCode, headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj) };
+}

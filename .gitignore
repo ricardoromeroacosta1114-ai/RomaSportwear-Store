@@ -1,4 +1,6 @@
-node_modules/
-.netlify/
 .DS_Store
+.netlify/
+.netlify/
 Thumbs.db
+node_modules/
+node_modules/

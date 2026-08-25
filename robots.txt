@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /.netlify/
+
+Sitemap: https://romasportwear.netlify.app/sitemap.xml
