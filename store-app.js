@@ -155,10 +155,26 @@ const ADMIN_VISIBLE=(function(){
   }catch(e){ return false; }
 })();
 
+/* ---------- eventos de conversion ---------- */
+/* Convierte SKUs del carrito al formato que espera analitica.js. */
+function evItems(lista){
+  return (lista||[]).map(function(i){
+    const inf=skuInfo(i.sku); if(!inf) return null;
+    return {sku:i.sku,nombre:inf.m.nombre,categoria:inf.m.cat,color:inf.m.color,
+            talla:inf.talla,precio:inf.m.precio,cant:i.cant};
+  }).filter(Boolean);
+}
+function evModelo(m,talla,cant){
+  return [{sku:(talla&&m.tallas[talla]&&m.tallas[talla].sku)||m.id,nombre:m.nombre,
+           categoria:m.cat,color:m.color,talla:talla||"",precio:m.precio,cant:cant||1}];
+}
+function ev(nombre,datos){ if(window.ROMA_EVENTO) window.ROMA_EVENTO(nombre,datos||{}); }
+
 /* ---------- carrito helpers ---------- */
 const skuInfo = sku => { for(const m of MODELOS) for(const [t,v] of Object.entries(m.tallas)) if(v.sku===sku) return {m,talla:t,stock:v.stock}; return null; };
 const cartCount = ()=>carrito.reduce((s,i)=>s+i.cant,0);
 function addSku(sku,cant=1,silencio=false){
+  ev("add_to_cart",{items:evItems([{sku,cant}]),valor:(skuInfo(sku)?skuInfo(sku).m.precio*cant:0)});
   const info=skuInfo(sku); if(!info) return false;
   const ya=carrito.find(i=>i.sku===sku);
   const actual=ya?ya.cant:0;
@@ -221,7 +237,10 @@ function totales(){
 
 /* ---------- router ---------- */
 const NAV=[["home","⌂","Inicio"],["tienda","▤","Tienda"],["armador","✦","Armar"],["looks","♡","Looks"],["perfil","◉","Perfil"]];
-function go(v,param=null){ vista=v; vistaParam=param; render(); window.scrollTo({top:0}); }
+function go(v,param=null){
+  if(v==="producto"&&param&&modelo(param)) ev("select_item",{items:evModelo(modelo(param)),valor:modelo(param).precio});
+  vista=v; vistaParam=param; render(); window.scrollTo({top:0});
+}
 function render(){
   $("nav").innerHTML=NAV.map(([k,ic,l])=>`<button class="${vista===k?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join("");
   const V=Object.assign({home:viewHome,tienda:viewTienda,producto:viewProducto,armador:viewArmador,looks:viewLooks,
@@ -331,6 +350,7 @@ function viewTienda(){
 
 function viewProducto(){
   const m=modelo(vistaParam); if(!m) return viewTienda();
+  ev("view_item",{items:evModelo(m),valor:m.precio});
   const colorSel=fichaColorSel[m.nombre]||m.color;
   const mSel=variantes(m.nombre).find(v=>v.color===colorSel)||m;
   const tallaSel=fichaTallaSel[mSel.id]||"";
@@ -554,6 +574,7 @@ function viewLooks(){
 
 /* ============ CARRITO ============ */
 function viewCarrito(){
+  ev("view_cart",{items:evItems(carrito),valor:totales().total});
   if(!carrito.length) return `<h2 class="titulo serif">Carrito</h2>
     <div class="vacio-msg"><div class="big">🛍</div><h3 class="serif">Tu carrito está vacío</h3>
     <p>El armador es el mejor lugar para empezar.</p>
@@ -640,6 +661,7 @@ function fusiona(){ const m={}; carrito.forEach(i=>{m[i.sku]=(m[i.sku]||0)+i.can
 /* ============ CHECKOUT ============ */
 let pagoSel = DB.load("pago","transferencia");
 function viewCheckout(){
+  ev("begin_checkout",{items:evItems(carrito),valor:totales().total});
   const T=totales(); const C=CFG();
   const pideCP = entrega==="nacional";
   return `<div class="back-row"><button onclick="go('carrito')">← Carrito</button></div>
@@ -734,12 +756,13 @@ function confirmarPedido(){
   const texto=L.join("\n");
   const ganados=Math.floor(T.total/10);
   ordenes.unshift({folio,fecha:new Date().toISOString().slice(0,10),total:T.total,puntos:ganados,
-    items:carrito.map(i=>{const {m,talla}=skuInfo(i.sku);return {n:m.nombre,c:m.color,t:talla,q:i.cant};}),
+    items:carrito.map(i=>{const {m,talla}=skuInfo(i.sku);return {n:m.nombre,c:m.color,t:talla,q:i.cant,sku:i.sku};}),
     entrega,pago:pagoSel,estado:pagoSel==="tarjeta"?"Pendiente de pago":"Pendiente de enviar",texto});
   DB.save("ordenes",ordenes);
   /* Con tarjeta todavia no sabemos si el pago se aprueba: conservamos el carrito
      y los puntos hasta que Mercado Pago responda (ver cierraPedido). Asi, si la
      tarjeta se rechaza, la clienta vuelve con su seleccion intacta. */
+  ev("add_payment_info",{items:evItems(carrito),valor:T.total,extra:{payment_type:pagoSel}});
   if(pagoSel==="tarjeta"){ pagarConMP(folio,T.total,carrito.map(i=>({sku:i.sku,cant:i.cant})),entrega); return; }
   cierraPedido(folio);
   navegaA("https://wa.me/"+C.whatsappNumber+"?text="+encodeURIComponent(texto));
@@ -749,6 +772,12 @@ function confirmarPedido(){
    el pedido quedo en firme (WhatsApp/transferencia, o tarjeta aprobada). */
 function cierraPedido(folio){
   const o=ordenes.find(x=>x.folio===folio);
+  /* purchase solo aqui: pedido en firme o tarjeta aprobada. */
+  if(o && !o.eventoCompra){
+    ev("purchase",{items:evItems((o.items||[]).filter(x=>x.sku).map(x=>({sku:x.sku,cant:x.q}))),valor:o.total,extra:{transaction_id:o.folio}});
+    if(window.ROMA_CONVERSION_COMPRA) window.ROMA_CONVERSION_COMPRA(o.folio,o.total);
+    o.eventoCompra=true;
+  }
   if(o && !o.puntosAplicados){ puntos+=(o.puntos||0); o.puntosAplicados=true;
     DB.save("puntos",puntos); DB.save("ordenes",ordenes); }
   carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null);
@@ -773,6 +802,19 @@ function nivelPctActual(){
   const C=CFG(), niv=nivelDe(puntos)[0];
   return niv==="Élite"?(C.eliteDiscountPct||0) : niv==="Oro"?(C.oroDiscountPct||0) : 0;
 }
+/* Entrada desde las paginas indexables: /productos/<slug>/ enlaza a
+   la tienda con ?producto=<slug> y abre esa prenda directamente. */
+function procesaEnlaceEntrada(){
+  try{
+    const qs=new URLSearchParams(location.search);
+    const prod=qs.get("producto"), v=qs.get("vista");
+    if(prod && modelo(prod)){ vista="producto"; vistaParam=prod; limpiaUrl(); return true; }
+    if(v && ["tienda","armador","looks","carrito","home"].indexOf(v)>=0){ vista=v; limpiaUrl(); return true; }
+  }catch(e){}
+  return false;
+}
+function limpiaUrl(){ try{ history.replaceState(null,"",location.pathname); }catch(e){} }
+
 function procesaRetornoMP(){
   const qs=new URLSearchParams(window.location.search);
   const mp=qs.get("mp"), folio=qs.get("folio");

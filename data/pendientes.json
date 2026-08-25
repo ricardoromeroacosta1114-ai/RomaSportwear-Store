@@ -1,0 +1,24 @@
+{
+  "camposSinDefinir": [
+    "correo",
+    "facebook",
+    "horarioAtencion",
+    "tiempoRespuesta",
+    "envios.paqueteria",
+    "envios.tiempoLocal",
+    "envios.tiempoNacional",
+    "envios.diasPreparacion",
+    "envios.rastreo",
+    "cambios.aceptaCambios",
+    "cambios.diasParaCambio",
+    "cambios.aceptaDevolucionDinero",
+    "cambios.condiciones",
+    "cambios.quienPagaEnvioCambio",
+    "cambios.comoSolicitar",
+    "recoleccion.direccion",
+    "legal.razonSocial",
+    "legal.rfc",
+    "legal.domicilioFiscal",
+    "legal.responsableDatos"
+  ]
+}

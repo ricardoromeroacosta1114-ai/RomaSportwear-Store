@@ -3,8 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>ROMA Sportswear</title>
-<meta name="description" content="ROMA Sportswear — Arma tu outfit completo.">
+<title>ROMA Sportwear | Ropa deportiva para mujer en Mexicali y envíos a todo México</title>
+<meta name="description" content="Ropa deportiva para moverte a tu manera. Compra por prenda o arma tu outfit completo. Entrega local en Mexicali y envío a todo México.">
+<link rel="canonical" href="https://romasportwear.netlify.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ROMA Sportwear">
+<meta property="og:locale" content="es_MX">
+<meta property="og:title" content="ROMA Sportwear | Ropa deportiva para mujer en Mexicali">
+<meta property="og:description" content="Ropa deportiva para moverte a tu manera. Compra por prenda o arma tu outfit completo. Entrega local en Mexicali y envío a todo México.">
+<meta property="og:url" content="https://romasportwear.netlify.app/">
+<meta property="og:image" content="https://romasportwear.netlify.app/icons/icon-512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ROMA Sportwear | Ropa deportiva para mujer en Mexicali">
+<meta name="twitter:description" content="Compra por prenda o arma tu outfit completo. Envío a todo México.">
+<meta name="twitter:image" content="https://romasportwear.netlify.app/icons/icon-512.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"ROMA Sportwear","url":"https://romasportwear.netlify.app/","logo":"https://romasportwear.netlify.app/icons/icon-512.png","areaServed":{"@type":"Country","name":"México"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"ROMA Sportwear","url":"https://romasportwear.netlify.app/","inLanguage":"es-MX"}</script>
 <link rel="manifest" href="manifest.json">
 <link rel="preload" as="image" href="icons/logo.png">
 <meta name="theme-color" content="#FAF8F3">
@@ -344,6 +358,37 @@ nav.bar button.on::after{content:"";width:4px;height:4px;border-radius:50%;backg
 .back-row button{font-size:13px;font-weight:600;color:var(--gris);display:flex;align-items:center;gap:5px}
 h2.titulo{font-size:30px;font-weight:600;padding:10px 20px 4px}
 p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
+
+/* ================= ESCRITORIO Y TABLET =================
+   En pantallas anchas la tienda deja de ser una app de celular estirada:
+   el contenido se centra, la cuadricula crece a 3-4 columnas y la barra
+   inferior (que solo tiene sentido en movil) se oculta. */
+@media (min-width:760px){
+  #app{padding-bottom:40px}
+  .envoltura-ancha,.grid,.hero,.ficha-body,.panel,.back-row,.combina,.cta-fija{max-width:1120px;margin-inline:auto}
+  .grid{grid-template-columns:repeat(3,1fr);gap:22px 20px;padding:10px 28px 28px}
+  header.top{padding-inline:28px}
+  .hero{padding-inline:28px}
+  .hero p{max-width:520px;font-size:16px}
+  /* La navegacion inferior es un patron movil: en escritorio estorba. */
+  nav.bar{display:none}
+  .cta-fija{position:static;margin:18px auto 8px;max-width:420px}
+  .ficha-fig{max-height:none;aspect-ratio:4/4.6;max-width:460px;margin-inline:auto}
+  .back-row{padding-inline:28px}
+}
+@media (min-width:1100px){
+  .grid{grid-template-columns:repeat(4,1fr)}
+}
+/* La ficha de producto en dos columnas cuando hay espacio */
+@media (min-width:900px){
+  .ficha-dos{display:grid;grid-template-columns:minmax(0,460px) minmax(0,1fr);gap:40px;
+    max-width:1120px;margin-inline:auto;align-items:start;padding-inline:28px}
+  .ficha-dos .ficha-fig{margin:0;max-width:none}
+  .ficha-dos .ficha-body{padding-top:0}
+}
+/* Accesibilidad: foco siempre visible con el teclado */
+:focus-visible{outline:3px solid var(--oro);outline-offset:2px;border-radius:8px}
+
 </style>
 </head>
 <body>
@@ -376,6 +421,8 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 </a>
 <div id="toast"></div>
 
+<script src="analitica-config.js"></script>
+<script src="analitica.js"></script>
 <script src="config.js"></script>
 <script src="catalogo.js"></script>
 <script src="supabase.js"></script>

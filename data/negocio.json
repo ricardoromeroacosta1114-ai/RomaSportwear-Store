@@ -1,0 +1,47 @@
+{
+  "_instrucciones": "Datos REALES del negocio. Todo lo que este vacio aparece marcado como PENDIENTE en el sitio y NO se inventa. Llena cada campo y vuelve a publicar.",
+
+  "nombre": "ROMA Sportwear",
+  "ciudad": "Mexicali, Baja California",
+  "whatsapp": "526633183894",
+  "correo": "",
+  "instagram": "https://www.instagram.com/roma.sportwear_/",
+  "facebook": "",
+  "horarioAtencion": "",
+  "tiempoRespuesta": "",
+
+  "envios": {
+    "entregaLocalCiudades": "Mexicali",
+    "costoLocal": 100,
+    "costoNacional": 200,
+    "envioGratisDesde": 500,
+    "paqueteria": "",
+    "tiempoLocal": "",
+    "tiempoNacional": "",
+    "diasPreparacion": "",
+    "rastreo": ""
+  },
+
+  "cambios": {
+    "aceptaCambios": null,
+    "diasParaCambio": null,
+    "aceptaDevolucionDinero": null,
+    "condiciones": "",
+    "quienPagaEnvioCambio": "",
+    "comoSolicitar": ""
+  },
+
+  "recoleccion": {
+    "activa": true,
+    "lugar": "Bazar Vintage Clothing",
+    "horario": "Viernes a domingo de 5:30 p.m. a 11:00 p.m.",
+    "direccion": ""
+  },
+
+  "legal": {
+    "razonSocial": "",
+    "rfc": "",
+    "domicilioFiscal": "",
+    "responsableDatos": ""
+  }
+}
