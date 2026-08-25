@@ -257,14 +257,23 @@ function figuraDe(m,h){
   const principal=imgs[m.imgPrincipal||0]||imgs[0];
   return principal?`<img src="${principal}" alt="${m.nombre} ${m.color}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:svgPrenda(m.forma,m.color,h);
 }
+/* Solo las tallas que de verdad tienen existencia. */
+function tallasDisp(m){
+  return Object.entries(m.tallas).filter(([,v])=>v.stock>0).map(([t])=>t);
+}
+function piezasTotales(m){
+  return Object.values(m.tallas).reduce((n,v)=>n+(v.stock>0?v.stock:0),0);
+}
+
 function cardProducto(m){
   const ago = m.agotado || !Object.values(m.tallas).some(v=>v.stock>0);
   const tag = ago?`<span class="tag" style="background:var(--gris)">AGOTADO</span>` : m.antes?`<span class="tag oferta">OFERTA</span>` : m.nuevo?`<span class="tag">NUEVO</span>`:"";
   return `<button class="p-card" style="${ago?'opacity:.55':''}" onclick="go('producto','${m.id}')">
     <div class="p-fig">${tag}${figuraDe(m,150)}</div>
     <div class="p-nombre">${m.nombre}</div>
-    <div class="p-meta">${m.color} · ${Object.keys(m.tallas).join(" / ")}</div>
+    <div class="p-meta">${m.color}${ago?"":" · Tallas "+tallasDisp(m).join(" / ")}</div>
     <div class="p-precio">${peso(m.precio)}${m.antes?`<s>${peso(m.antes)}</s>`:""}</div>
+    ${!ago&&piezasTotales(m)<=2?`<div class="p-ultimas">Últimas ${piezasTotales(m)} piezas</div>`:""}
   </button>`;
 }
 
@@ -282,17 +291,48 @@ function lookFlat(sl,esc=1){
     ${b?`<div style="position:absolute;right:12%;top:34px;transform:rotate(6deg)">${svgPrenda(b.forma,b.color,150*esc)}</div>`:""}`;
 }
 
+/* Indicador de progreso hacia el envio gratis. Solo aparece si la
+   condicion existe de verdad en la configuracion de la tienda. */
+function barraEnvioGratis(){
+  const C=CFG(), meta=Number(C.freeShippingFrom)||0;
+  if(meta<=0) return "";
+  const sub=carrito.reduce((t,i)=>{const inf=skuInfo(i.sku);return t+(inf?inf.m.precio*i.cant:0);},0);
+  if(sub<=0) return `<div class="envio-barra"><span>Envío gratis en compras desde ${peso(meta)}</span></div>`;
+  if(sub>=meta) return `<div class="envio-barra listo"><span>✓ ¡Tu envío es gratis!</span></div>`;
+  const falta=meta-sub, pct=Math.min(100,Math.round(sub/meta*100));
+  return `<div class="envio-barra">
+    <span>Te faltan <b>${peso(falta)}</b> para envío gratis</span>
+    <div class="envio-pista"><i style="width:${pct}%"></i></div></div>`;
+}
+
+/* Pie con enlaces a las paginas de confianza (tambien ayuda al SEO interno). */
+function pieTienda(){
+  return `<footer class="pie">
+    <div class="pie-links">
+      <a href="/envios/">Envíos</a><a href="/cambios/">Cambios y devoluciones</a>
+      <a href="/guia-de-tallas/">Guía de tallas</a><a href="/preguntas-frecuentes/">Preguntas frecuentes</a>
+      <a href="/sobre-roma/">Sobre ROMA</a><a href="/contacto/">Contacto</a>
+      <a href="/terminos/">Términos</a><a href="/privacidad/">Aviso de privacidad</a>
+    </div>
+    <p class="pie-nota">ROMA Sportwear · Mexicali, B.C. · Precios en pesos mexicanos (MXN)</p>
+  </footer>`;
+}
+
 function viewHome(){
   const nuevos=MODELOS.filter(m=>m.nuevo);
   const ofertas=MODELOS.filter(m=>m.antes);
   const cats=["Todo","Leggings","Playeras","Chamarras","Nuevo","Ofertas"];
   return `
   <section class="hero">
-    <div class="eyebrow">Mexicali · Nueva colección</div>
-    <h1 class="serif">El look<br>completo.</h1>
-    <p>Compra por prenda o combina tu look completo con Roma.</p>
-    <button class="btn-oro" onclick="go('armador')"><span class="fl">✦</span> Arma tu outfit</button>
+    <div class="eyebrow">Mexicali · Envíos a todo México</div>
+    <h1 class="serif">Ropa deportiva<br>para moverte<br>a tu manera.</h1>
+    <p>Compra por prenda o arma tu outfit completo.</p>
+    <div class="hero-cta">
+      <button class="btn-oro" onclick="go('tienda')">Comprar colección</button>
+      <button class="btn-linea" onclick="go('armador')"><span class="fl">✦</span> Armar mi outfit</button>
+    </div>
   </section>
+  ${barraEnvioGratis()}
   <div class="chips">${cats.map(c=>`<button class="chip ${catFiltro===c?'on':''}" onclick="catFiltro='${c}';go('tienda')">${c}</button>`).join("")}</div>
 
   <section class="sec"><div class="sec-head"><h3 class="serif">Outfits armados por ROMA</h3></div></section>
@@ -314,7 +354,8 @@ function viewHome(){
 
   <section class="sec"><div class="sec-head"><h3 class="serif">Ofertas</h3>
     <button onclick="catFiltro='Ofertas';go('tienda')">Ver todo →</button></div></section>
-  <div class="carrusel">${ofertas.map(cardProducto).join("")}</div>`;
+  <div class="carrusel">${ofertas.map(cardProducto).join("")}</div>
+  ${pieTienda()}`;
 }
 
 function viewTienda(){
@@ -345,7 +386,8 @@ function viewTienda(){
     ${(filtroTalla||filtroColor||filtroPrecio||filtroDisp)?`<button class="chip" onclick="filtroTalla='';filtroColor='';filtroPrecio='';render()">Limpiar ✕</button>`:""}
   </div>
   ${list.length?`<div class="grid">${list.map(cardProducto).join("")}</div>`
-   :`<div class="vacio-msg"><div class="big">◌</div><h3 class="serif">Sin resultados</h3><p>Prueba con otros filtros.</p></div>`}`;
+   :`<div class="vacio-msg"><div class="big">◌</div><h3 class="serif">Sin resultados</h3><p>Prueba con otros filtros.</p></div>`}
+  ${pieTienda()}`;
 }
 
 function viewProducto(){
@@ -670,6 +712,7 @@ function viewCheckout(){
     <h4>Tus datos</h4>
     <div class="field"><label>Nombre completo</label><input id="ckNombre" value="${perfil.nombre||""}" placeholder="Tu nombre completo"></div>
     <div class="field"><label>Tu WhatsApp</label><input id="ckWhats" inputmode="tel" value="${perfil.whats||""}" placeholder="686 000 0000"></div>
+    <div class="field"><label>Correo electrónico</label><input id="ckCorreo" type="email" inputmode="email" autocomplete="email" value="${perfil.correo||""}" placeholder="tucorreo@ejemplo.com"></div>
   </div>
   <div class="panel">
     <h4>Entrega · ${entrega==="pickup"?"Recoger personalmente":entrega==="local"?"Entrega local en Mexicali":"Envío nacional"}</h4>
@@ -709,6 +752,7 @@ function viewCheckout(){
     <div class="tot-row big"><span>Total</span><span>${peso(T.total)}</span></div>
   </div>
   <p style="padding:0 22px;font-size:12px;color:var(--gris)">${pagoSel==="tarjeta"?"Al confirmar te llevamos a Mercado Pago para pagar con tarjeta de forma segura.":"Al confirmar se abre WhatsApp con tu pedido armado — solo presiona enviar para que ROMA lo confirme."}</p>
+  <p class="aviso-legal">Al confirmar aceptas los <a href="/terminos/">términos y condiciones</a> y el <a href="/privacidad/">aviso de privacidad</a>. Consulta <a href="/cambios/">cambios y devoluciones</a>.</p>
   <div style="margin:14px 20px"><button class="btn-cart" style="width:100%" onclick="confirmarPedido()">${pagoSel==="tarjeta"?"Pagar con tarjeta · "+peso(T.total):"Enviar pedido por WhatsApp"}</button></div>`;
 }
 function nuevoFolio(){
@@ -719,6 +763,7 @@ function nuevoFolio(){
 function confirmarPedido(){
   const C=CFG();
   const nombre=$("ckNombre").value.trim(), whats=$("ckWhats").value.trim();
+  const correo=$("ckCorreo")?$("ckCorreo").value.trim():"";
   const notas=$("ckNotas")?$("ckNotas").value.trim():"";
   let dir="", col="", cp="", ciudad="", ref="";
   if(entrega!=="pickup"){
@@ -727,9 +772,10 @@ function confirmarPedido(){
   }
   if(!nombre){ toast("Escribe tu nombre completo"); return; }
   if(!whats){ toast("Escribe tu WhatsApp"); return; }
+  if(correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)){ toast("Revisa tu correo electrónico"); return; }
   if(entrega!=="pickup"&&(!dir||!col)){ toast("Falta la dirección o colonia"); return; }
   if(entrega==="nacional"&&(!cp||!ciudad)){ toast("Falta código postal o ciudad"); return; }
-  perfil={...perfil,nombre,whats,dir:entrega!=="pickup"?dir:perfil.dir,col,cp,ciudad,ref}; DB.save("perfil",perfil);
+  perfil={...perfil,nombre,whats,correo,dir:entrega!=="pickup"?dir:perfil.dir,col,cp,ciudad,ref}; DB.save("perfil",perfil);
   const T=totales();
   const folio=nuevoFolio();
   const entTxt = entrega==="pickup" ? "Recoger personalmente ("+C.pickupAddress+")"
@@ -738,7 +784,9 @@ function confirmarPedido(){
   const L=[];
   L.push("🛍 *PEDIDO "+folio+"*","");
   L.push("*Cliente:* "+nombre);
-  L.push("*WhatsApp:* "+whats,"");
+  L.push("*WhatsApp:* "+whats);
+  if(correo) L.push("*Correo:* "+correo);
+  L.push("");
   L.push("*Productos:*");
   carrito.forEach(i=>{const {m,talla}=skuInfo(i.sku);
     L.push("- "+i.cant+"x "+m.nombre+" | "+m.color+" | Talla "+talla+" | "+peso(m.precio)+" c/u = "+peso(m.precio*i.cant));});

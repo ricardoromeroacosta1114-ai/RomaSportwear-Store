@@ -389,6 +389,37 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 /* Accesibilidad: foco siempre visible con el teclado */
 :focus-visible{outline:3px solid var(--oro);outline-offset:2px;border-radius:8px}
 
+
+/* ============ CONVERSION Y CONFIANZA ============ */
+.hero-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.hero-cta .btn-oro,.hero-cta .btn-linea{flex:0 1 auto}
+
+/* Progreso hacia el envio gratis */
+.envio-barra{margin:2px 20px 10px;background:var(--papel2);border-radius:14px;padding:11px 14px;
+  font-size:13px;color:var(--gris);display:flex;flex-direction:column;gap:7px}
+.envio-barra b{color:var(--tinta)}
+.envio-barra.listo{color:var(--oro);font-weight:700}
+.envio-pista{height:6px;border-radius:100px;background:var(--linea);overflow:hidden}
+.envio-pista i{display:block;height:100%;background:var(--oro);border-radius:100px;transition:width .4s ease}
+
+/* Aviso de "ultimas piezas" en la tarjeta */
+.p-ultimas{font-size:11px;font-weight:700;color:var(--oro);letter-spacing:.3px;margin-top:2px}
+
+/* Politicas antes de pagar */
+.aviso-legal{padding:0 22px;font-size:12px;color:var(--gris);line-height:1.6}
+.aviso-legal a{color:var(--oro);font-weight:600;text-decoration:underline}
+
+/* Pie de la tienda */
+.pie{margin:34px 0 10px;padding:22px 20px calc(20px + var(--safe-b));border-top:1px solid var(--linea)}
+.pie-links{display:flex;flex-wrap:wrap;gap:10px 18px}
+.pie-links a{font-size:13px;color:var(--gris);text-decoration:none;padding:4px 0}
+.pie-links a:hover,.pie-links a:focus-visible{color:var(--tinta);text-decoration:underline}
+.pie-nota{margin-top:14px;font-size:12px;color:var(--gris)}
+@media (min-width:760px){
+  .pie{max-width:1120px;margin-inline:auto;padding-inline:28px}
+  .envio-barra{max-width:1120px;margin-inline:auto}
+}
+
 </style>
 </head>
 <body>
