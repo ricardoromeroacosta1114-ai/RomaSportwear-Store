@@ -558,15 +558,29 @@ img.fig3d{display:block;object-fit:contain}
 }
 
 
-/* ============ MONOGRAMA 3D DE MARCA ============
-   Se carga diferido y solo en conexiones rápidas (ver movimiento.js).
-   Mientras no llegue, no ocupa espacio ni descarga nada. */
-.marca3d{width:0;height:0;overflow:hidden;border-radius:50%;opacity:0;
-  transition:opacity .6s ease;margin:0 auto;flex-shrink:0}
-.marca3d.listo{width:132px;height:132px;opacity:1;margin:4px auto 14px;
-  box-shadow:0 14px 34px rgba(20,18,16,.16)}
-.marca3d video{width:100%;height:100%;object-fit:cover;display:block}
-@media (min-width:760px){.marca3d.listo{width:168px;height:168px}}
+
+/* ============ MONOGRAMA DE MARCA ============
+   Solo el logo, sin recuadro ni círculo. Usa el PNG transparente
+   (18 KB) con sus versiones clara y oscura, y gira suavemente en 3D. */
+.marca3d{width:112px;margin:2px auto 12px;perspective:600px}
+.marca3d img{width:100%;height:auto;display:block}
+.marca3d .logo-dark{display:none}
+html[data-tema="oscuro"] .marca3d .logo-light{display:none}
+html[data-tema="oscuro"] .marca3d .logo-dark{display:block}
+.con-motion .marca3d img{animation:giraMarca 9s ease-in-out infinite;transform-style:preserve-3d}
+@keyframes giraMarca{
+  0%,100%{transform:rotateY(0deg)}
+  50%{transform:rotateY(24deg)}
+}
+@media (min-width:760px){.marca3d{width:140px}}
+
+/* Prendas en el carrusel de looks, carrito y hojas */
+.look-fila{display:flex;align-items:flex-end;justify-content:center;gap:6px;width:100%;height:100%;padding:8px}
+.look-celda{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center}
+.look-celda img.fig3d,.look-celda svg{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.cf img.fig3d,.c-fig img.fig3d,.ht-fig img.fig3d{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.ht-fig{width:52px;height:56px;display:flex;align-items:center;justify-content:center}
+.c-fig img.fig3d{padding:2px}
 
 </style>
 </head>

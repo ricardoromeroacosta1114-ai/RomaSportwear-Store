@@ -169,7 +169,9 @@ function altPrenda(m){
 function figura3D(m, alto){
   const url = render3D(m);
   if(!url) return null;
-  return `<img class="fig3d" src="${url}" alt="${altPrenda(m)}" loading="lazy"           style="height:${alto}px" width="512" height="512">`;
+  /* Sin alto explicito manda el CSS del contenedor. */
+  const est = alto ? ` style="height:${alto}px;width:auto"` : "";
+  return `<img class="fig3d" src="${url}" alt="${altPrenda(m)}"${est} width="700" height="700" loading="lazy" decoding="async">`;
 }
 
 /* ---------- eventos de conversion ---------- */
@@ -269,6 +271,10 @@ function render(){
 /* ============================================================
    VISTAS
 ============================================================ */
+/* Imagen de una prenda en cualquier tamaño: render 3D si existe,
+   dibujo vectorial como respaldo. */
+function prendaImg(m,h){ return figura3D(m,h) || svgPrenda(m.forma,m.color,h); }
+
 function figuraDe(m,h){
   const imgs=m.imagenes||[];
   const principal=imgs[m.imgPrincipal||0]||imgs[0];
@@ -304,9 +310,11 @@ const LOOKS_ROMA=[
 function lookPrecio(sl){ return ["arriba","abajo","capa"].reduce((s,k)=>{const m=sl[k]&&modelo(sl[k]);return s+(m?m.precio:0);},0); }
 function lookFlat(sl,esc=1){
   const a=sl.arriba&&modelo(sl.arriba), b=sl.abajo&&modelo(sl.abajo), c=sl.capa&&modelo(sl.capa);
-  return `${c?`<div style="position:absolute;left:14%;top:12px;transform:rotate(-7deg)">${svgPrenda(c.forma,c.color,120*esc)}</div>`:""}
-    ${a?`<div style="position:absolute;left:50%;top:8px;transform:translateX(-42%)">${svgPrenda(a.forma,a.color,118*esc)}</div>`:""}
-    ${b?`<div style="position:absolute;right:12%;top:34px;transform:rotate(6deg)">${svgPrenda(b.forma,b.color,150*esc)}</div>`:""}`;
+  const piezas=[c,a,b].filter(Boolean);
+  if(!piezas.length) return "";
+  /* Fila limpia: cada prenda en su celda, sin superponerse. */
+  return `<div class="look-fila">${piezas.map(m=>
+    `<span class="look-celda">${prendaImg(m,0)}</span>`).join("")}</div>`;
 }
 
 /* Indicador de progreso hacia el envio gratis. Solo aparece si la
@@ -342,7 +350,7 @@ function viewHome(){
   const cats=["Todo","Leggings","Playeras","Chamarras","Nuevo","Ofertas"];
   return `
   <section class="hero">
-    <div class="marca3d" aria-hidden="true"></div>
+    <div class="marca3d"><img class="logo-light" src="/icons/logo.png" width="391" height="280" alt="ROMA Sportwear"><img class="logo-dark" src="/icons/logo-dark.png" width="391" height="280" alt=""></div>
     <div class="eyebrow">Mexicali · Envíos a todo México</div>
     <h1 class="serif">Ropa deportiva<br>para moverte<br>a tu manera.</h1>
     <p>Compra por prenda o arma tu outfit completo.</p>
@@ -459,7 +467,7 @@ function viewProducto(){
     <p>Complementa el look — y desbloquea el ${CFG().outfitDiscountPct}% del outfit completo.</p>
     <div class="combo-row">
       ${combos.map(c=>`<button class="combo-it" onclick="go('producto','${c.id}')">
-        <div class="cf">${svgPrenda(c.forma,c.color,74)}</div>
+        <div class="cf">${prendaImg(c,0)}</div>
         <span>${c.nombre}</span><small>${c.color} · ${peso(c.precio)}</small></button>`).join("")}
       <button class="combo-it" style="background:var(--tinta);color:var(--papel)" onclick="abrirEnArmador('${mSel.id}')">
         <div class="cf" style="font-size:26px;color:var(--oro-suave)">✦</div>
@@ -511,7 +519,7 @@ function viewArmador(){
     const activo = slotActivo===k ? " activo" : "";
     if(!m) return `<button class="zona vacia${activo}" data-z="${k}" onclick="slotActivo='${k}';render()">
       <span class="mas">+</span><span class="zl">${label}</span></button>`;
-    const fig = figura3D(m,0) || svgPrenda(m.forma,m.color,110);
+    const fig = prendaImg(m,0);
     return `<button class="zona llena${activo}" data-z="${k}" onclick="slotActivo='${k}';render()">
       <span class="zfig">${fig}</span>
       <span class="zt">${m.nombre.replace("Leggings ","")}<small>${m.color}</small></span>
@@ -548,7 +556,7 @@ function viewArmador(){
     <h4>Elige ${etiqueta[slotActivo]||"la prenda"}</h4>
     <div class="pick-scroll">
       ${pickPool.map(m=>`<button class="pick ${outfit[slotActivo]===m.id?"on":""}" onclick="outfit['${slotActivo}']='${m.id}';DB.save('outfit',outfit);render()">
-        <span class="pf">${figura3D(m,0)||svgPrenda(m.forma,m.color,58)}</span>
+        <span class="pf">${prendaImg(m,0)}</span>
         <span class="pn">${m.nombre.replace("Leggings ","")}<small>${m.color}</small></span></button>`).join("")}
     </div>
   </div>
@@ -568,7 +576,7 @@ function pideTallasOutfit(cb){
     <div class="asa"></div><h3 class="serif" style="font-size:24px;margin-bottom:2px">Tallas del outfit</h3>
     <p style="color:var(--gris);font-size:13px;margin-bottom:14px">Elige la talla de cada pieza.</p>
     ${piezas.map(m=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--linea)">
-      <div style="width:52px">${svgPrenda(m.forma,m.color,48)}</div>
+      <div class="ht-fig">${prendaImg(m,0)}</div>
       <div style="flex:1"><b style="font-size:13.5px">${m.nombre}</b><br><small style="color:var(--gris)">${m.color}</small></div>
       <div class="tallas" style="gap:6px">${["S","M","L"].map(t=>{
         const v=m.tallas[t], ag=!v||v.stock<=0;
@@ -611,14 +619,26 @@ async function compartirLook(){
     x.fillStyle="#141210"; x.font="700 92px Cormorant Garamond, serif"; x.textAlign="center";
     x.fillText("R O M A",540,150);
     x.font="600 30px Inter, sans-serif"; x.fillStyle="#B08D3E"; x.fillText("S P O R T S W E A R",540,200);
-    const dib=async(m,px,py,h)=>{ if(!m) return;
+    /* Dibuja una prenda centrada en su celda, respetando su proporcion. */
+    const dib=async(m,cx,cy,caja)=>{ if(!m) return;
+      const url=render3D(m);
       const img=new Image();
-      img.src="data:image/svg+xml;utf8,"+encodeURIComponent(svgPrenda(m.forma,m.color,h).replace('height="'+h+'"','width="'+Math.round(h*100/130)+'" height="'+h+'"'));
+      if(url){ img.src=url; }
+      else { const h=caja;
+        img.src="data:image/svg+xml;utf8,"+encodeURIComponent(svgPrenda(m.forma,m.color,h).replace('height="'+h+'"','width="'+Math.round(h*100/130)+'" height="'+h+'"')); }
       await new Promise(r=>{img.onload=r;img.onerror=r;});
-      x.drawImage(img,px,py);
+      if(!img.width||!img.height) return;
+      const esc=Math.min(caja/img.width, caja/img.height);
+      const w=img.width*esc, hh=img.height*esc;
+      x.drawImage(img, cx-w/2, cy-hh/2, w, hh);
     };
     const a=outfit.arriba&&modelo(outfit.arriba), b=outfit.abajo&&modelo(outfit.abajo), c=outfit.capa&&modelo(outfit.capa);
-    await dib(c,150,300,430); await dib(a,400,270,450); await dib(b,620,420,560);
+    const piezas=[c,a,b].filter(Boolean);
+    /* Reparte el ancho entre las piezas elegidas: nunca se montan. */
+    const anchoCelda = 900/Math.max(piezas.length,1);
+    for(let i=0;i<piezas.length;i++){
+      await dib(piezas[i], 90+anchoCelda*(i+0.5), 620, Math.min(anchoCelda*0.92, 520));
+    }
     let y=1090; x.fillStyle="#141210"; x.font="600 40px Inter,sans-serif"; x.textAlign="left";
     [c,a,b].filter(Boolean).forEach(m=>{ x.fillText(m.nombre+" · "+m.color,120,y); x.textAlign="right"; x.fillText("$"+m.precio,960,y); x.textAlign="left"; y+=60; });
     x.fillStyle="#B08D3E"; x.font="700 46px Inter,sans-serif";
@@ -663,7 +683,7 @@ function viewCarrito(){
   const items=carrito.map((i,idx)=>{
     const {m,talla,stock}=skuInfo(i.sku);
     return `<div class="c-item">
-      <div class="c-fig">${svgPrenda(m.forma,m.color,66)}</div>
+      <div class="c-fig">${prendaImg(m,0)}</div>
       <div class="c-info"><b>${m.nombre}</b><small>${m.color}</small>
         <div class="c-edit">
           <select onchange="cambiaTalla(${idx},this.value)">${["S","M","L"].map(t=>{

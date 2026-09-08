@@ -127,25 +127,4 @@
     }
   });
 
-  /* ---------- 6) Monograma 3D de marca ----------
-     Se carga SOLO si la conexion lo permite y despues de que la tienda
-     ya es usable. Nunca bloquea el arranque ni gasta datos de mas. */
-  function cargaMarca3D() {
-    var c = navigator.connection || {};
-    if (c.saveData) return;
-    if (c.effectiveType && c.effectiveType.indexOf("4g") < 0) return;
-    var hueco = document.querySelector(".marca3d");
-    if (!hueco || hueco.dataset.listo) return;
-    hueco.dataset.listo = "1";
-    var v = document.createElement("video");
-    v.autoplay = true; v.muted = true; v.loop = true; v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("aria-hidden", "true");
-    v.addEventListener("canplay", function () { hueco.classList.add("listo"); });
-    v.src = "/marca/monograma-3d.mp4";
-    hueco.appendChild(v);
-  }
-  document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(cargaMarca3D, 2400);
-  });
 })();
