@@ -1,5 +1,5 @@
-const CACHE = 'roma-store-v9';
-const ASSETS = ['./','./index.html','./store-app.js','./movimiento.js','./analitica.js','./config.js','./admin.js','./supabase.js','./manifest.json','./fonts/fonts.css',
+const CACHE = 'roma-store-v10';
+const ASSETS = ['./','./index.html','./store-app.js','./movimiento.js','./renders3d.js','./analitica.js','./config.js','./admin.js','./supabase.js','./manifest.json','./fonts/fonts.css',
   './icons/icon-192.png','./icons/icon-512.png','./icons/apple-touch-icon.png','./icons/logo.png','./icons/logo-dark.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

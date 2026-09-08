@@ -155,6 +155,23 @@ const ADMIN_VISIBLE=(function(){
   }catch(e){ return false; }
 })();
 
+/* ---------- renders 3D de prendas ----------
+   Ilustraciones 3D generadas para el catalogo (fondo recortado).
+   NO son fotografias del producto: se etiquetan como ilustracion.
+   Cuando existan fotos reales, imagenes[] del modelo tiene prioridad. */
+function render3D(m){
+  return (window.RENDERS_3D && window.RENDERS_3D[m.id]) || null;
+}
+function altPrenda(m){
+  return m.nombre + " " + m.color + " — ilustración 3D referencial de ROMA Sportwear";
+}
+/* Figura de la prenda: foto real > render 3D > dibujo vectorial. */
+function figura3D(m, alto){
+  const url = render3D(m);
+  if(!url) return null;
+  return `<img class="fig3d" src="${url}" alt="${altPrenda(m)}" loading="lazy"           style="height:${alto}px" width="512" height="512">`;
+}
+
 /* ---------- eventos de conversion ---------- */
 /* Convierte SKUs del carrito al formato que espera analitica.js. */
 function evItems(lista){
@@ -255,6 +272,7 @@ function render(){
 function figuraDe(m,h){
   const imgs=m.imagenes||[];
   const principal=imgs[m.imgPrincipal||0]||imgs[0];
+  if(!principal){ const r=figura3D(m,h); if(r) return r; }
   return principal?`<img src="${principal}" alt="${m.nombre} ${m.color}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:svgPrenda(m.forma,m.color,h);
 }
 /* Solo las tallas que de verdad tienen existencia. */
@@ -324,6 +342,7 @@ function viewHome(){
   const cats=["Todo","Leggings","Playeras","Chamarras","Nuevo","Ofertas"];
   return `
   <section class="hero">
+    <div class="marca3d" aria-hidden="true"></div>
     <div class="eyebrow">Mexicali · Envíos a todo México</div>
     <h1 class="serif">Ropa deportiva<br>para moverte<br>a tu manera.</h1>
     <p>Compra por prenda o arma tu outfit completo.</p>
@@ -484,36 +503,53 @@ function viewArmador(){
   const completo=!!((a||c)&&b);
   const pctLook=CFG().outfitDiscountPct;
   const conDesc=completo?precio*(1-pctLook/100):precio;
-  const slotBtn=(k,label,top,size)=>{
+
+  /* Cada prenda vive en su propia zona: capa y arriba comparten la fila
+     superior (lado a lado, sin encimarse) y abajo ocupa la fila inferior. */
+  const zona=(k,label)=>{
     const m=outfit[k]&&modelo(outfit[k]);
-    return m
-      ? `<button class="slot slot-${k}" style="top:${top}px" onclick="slotActivo='${k}';render()">${svgPrenda(m.forma,m.color,size)}</button>`
-      : `<button class="slot vacio slot-${k}" style="top:${top}px;width:120px;height:${size*0.8}px" onclick="slotActivo='${k}';render()">+ ${label}</button>`;
+    const activo = slotActivo===k ? " activo" : "";
+    if(!m) return `<button class="zona vacia${activo}" data-z="${k}" onclick="slotActivo='${k}';render()">
+      <span class="mas">+</span><span class="zl">${label}</span></button>`;
+    const fig = figura3D(m,0) || svgPrenda(m.forma,m.color,110);
+    return `<button class="zona llena${activo}" data-z="${k}" onclick="slotActivo='${k}';render()">
+      <span class="zfig">${fig}</span>
+      <span class="zt">${m.nombre.replace("Leggings ","")}<small>${m.color}</small></span>
+      <span class="zq" onclick="event.stopPropagation();outfit['${k}']=null;DB.save('outfit',outfit);render()" role="button" aria-label="Quitar">✕</span>
+    </button>`;
   };
+
   const pickPool=MODELOS.filter(m=>m.tipo===slotActivo);
+  const etiqueta={arriba:"Arriba",abajo:"Abajo",capa:"Capa"};
   return `
-  <h2 class="titulo serif">Armador de outfits</h2>
-  <p class="subtitulo">Toca una zona del tablero y elige la prenda. Arriba + abajo = ${CFG().outfitDiscountPct}% de descuento.</p>
-  <div class="board">
-    <div class="board-flat">
-      <span class="sello ${completo?'on':''}">LOOK ROMA −${CFG().outfitDiscountPct}%</span>
-      ${slotBtn("capa","Capa (opcional)",10,105)}
-      ${slotBtn("arriba","Arriba",34,110)}
-      ${slotBtn("abajo","Abajo",148,158)}
+  <h2 class="titulo serif">Arma tu outfit</h2>
+  <p class="subtitulo">Elige una zona y escoge la prenda. Arriba + abajo = ${pctLook}% de descuento.</p>
+
+  <div class="lienzo">
+    <span class="sello ${completo?"on":""}">LOOK ROMA −${pctLook}%</span>
+    <div class="lienzo-sup">
+      ${zona("arriba","Arriba")}
+      ${zona("capa","Capa · opcional")}
     </div>
-    <div class="board-info">
-      <div><div class="tt">${completo?"Look completo":"Tu look va tomando forma"}</div>
-        <div class="pp">${peso(conDesc)} ${completo?`<small>ahorras ${peso(precio-conDesc)} con LOOK15</small>`:""}</div></div>
-      ${(a||b||c)?`<button class="mini-btn sec2" onclick="outfit={arriba:null,abajo:null,capa:null};DB.save('outfit',outfit);render()">Vaciar</button>`:""}
+    <div class="lienzo-inf">
+      ${zona("abajo","Abajo")}
     </div>
   </div>
 
+  <div class="resumen-look">
+    <div>
+      <div class="tt">${completo?"Look completo":"Tu look va tomando forma"}</div>
+      <div class="pp">${peso(conDesc)}${completo?`<small>ahorras ${peso(precio-conDesc)}</small>`:""}</div>
+    </div>
+    ${(a||b||c)?`<button class="mini-btn sec2" onclick="outfit={arriba:null,abajo:null,capa:null};DB.save('outfit',outfit);render()">Vaciar</button>`:""}
+  </div>
+
   <div class="pick-row">
-    <h4>${slotActivo==="arriba"?"Elige la prenda de arriba":slotActivo==="abajo"?"Elige la prenda de abajo":"Elige tu capa"}</h4>
+    <h4>Elige ${etiqueta[slotActivo]||"la prenda"}</h4>
     <div class="pick-scroll">
-      ${outfit[slotActivo]?`<button class="pick quitar" onclick="outfit['${slotActivo}']=null;DB.save('outfit',outfit);render()">✕ Quitar</button>`:""}
-      ${pickPool.map(m=>`<button class="pick ${outfit[slotActivo]===m.id?'on':''}" onclick="outfit['${slotActivo}']='${m.id}';DB.save('outfit',outfit);render()">
-        <div class="pf">${svgPrenda(m.forma,m.color,58)}</div><span>${m.nombre.replace("Leggings ","")}<br><small style="color:var(--gris)">${m.color}</small></span></button>`).join("")}
+      ${pickPool.map(m=>`<button class="pick ${outfit[slotActivo]===m.id?"on":""}" onclick="outfit['${slotActivo}']='${m.id}';DB.save('outfit',outfit);render()">
+        <span class="pf">${figura3D(m,0)||svgPrenda(m.forma,m.color,58)}</span>
+        <span class="pn">${m.nombre.replace("Leggings ","")}<small>${m.color}</small></span></button>`).join("")}
     </div>
   </div>
 
@@ -523,7 +559,8 @@ function viewArmador(){
       <button class="btn-linea" style="flex:1" onclick="guardarLook()" ${!(a||b||c)?"disabled style='flex:1;opacity:.4'":""}>♡ Guardar en Mis Looks</button>
       <button class="btn-linea" style="flex:1" onclick="compartirLook()" ${!(a||b||c)?"disabled style='flex:1;opacity:.4'":""}>↗ Compartir</button>
     </div>
-  </div>`;
+  </div>
+`;
 }
 function pideTallasOutfit(cb){
   const piezas=["capa","arriba","abajo"].filter(k=>outfit[k]).map(k=>modelo(outfit[k]));

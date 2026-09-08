@@ -454,11 +454,6 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 .con-motion .hero>*{transform:translateY(var(--par,0));opacity:var(--fade,1);
   transition:opacity .25s linear}
 
-/* Monograma 3D de marca en el splash */
-#splash .sp-video{width:164px;height:164px;border-radius:50%;overflow:hidden;
-  opacity:0;transform:scale(.74);animation:spLogo .8s cubic-bezier(.22,1,.36,1) .05s forwards}
-#splash .sp-video video{width:100%;height:100%;object-fit:cover;display:block}
-
 /* Botones con reaccion tactil */
 .con-motion .btn-cart,.con-motion .btn-oro,.con-motion .btn-linea,.con-motion .mini-btn{
   transition:transform .18s cubic-bezier(.34,1.6,.64,1),box-shadow .25s ease,background .25s ease}
@@ -498,6 +493,80 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 @keyframes cintaCorre{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .cinta:hover .cinta-pista{animation-play-state:paused}
 @media (min-width:760px){.cinta{text-align:center}.cinta-pista{justify-content:center}}
+
+
+/* ============ ARMADOR LIMPIO ============
+   Cada prenda tiene su propia zona. Nada se encima:
+   arriba y capa comparten la fila superior lado a lado,
+   y la prenda de abajo ocupa la fila inferior completa. */
+.lienzo{position:relative;margin:10px 20px;padding:16px;border-radius:26px;
+  background:var(--blanco);border:1px solid var(--linea);box-shadow:var(--sombra);
+  display:flex;flex-direction:column;gap:12px}
+.lienzo-sup{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lienzo-inf{display:grid;grid-template-columns:1fr}
+
+.zona{position:relative;border-radius:18px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;padding:14px 10px;
+  background:var(--papel2);border:1.5px solid transparent;transition:.25s;min-height:150px}
+.lienzo-inf .zona{min-height:190px}
+.zona.activo{border-color:var(--oro);box-shadow:0 0 0 3px var(--oro-tenue)}
+.zona.vacia{border:1.5px dashed color-mix(in srgb,var(--oro) 45%,transparent);background:transparent}
+.zona.vacia .mas{font-size:26px;color:var(--oro);line-height:1}
+.zona.vacia .zl{font-size:11.5px;color:var(--gris);font-weight:600;letter-spacing:.4px;text-align:center}
+
+.zona .zfig{display:flex;align-items:center;justify-content:center;width:100%;flex:1;min-height:0}
+.zona .zfig img.fig3d,.zona .zfig svg{max-height:100%;max-width:92%;height:auto;width:auto;object-fit:contain}
+.lienzo-sup .zona .zfig{height:104px}
+.lienzo-inf .zona .zfig{height:150px}
+.zona .zt{font-size:12px;font-weight:700;text-align:center;line-height:1.25}
+.zona .zt small{display:block;font-weight:500;color:var(--gris);font-size:11px}
+.zona .zq{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;
+  background:var(--papel);color:var(--gris);display:flex;align-items:center;justify-content:center;
+  font-size:12px;border:1px solid var(--linea)}
+.zona .zq:hover{background:var(--tinta);color:var(--papel)}
+
+.lienzo .sello{position:absolute;top:-9px;right:14px;background:var(--oro);color:#fff;
+  font-size:10px;font-weight:700;letter-spacing:.6px;padding:5px 11px;border-radius:100px;
+  transform:scale(0);transition:transform .3s cubic-bezier(.34,1.6,.64,1);z-index:4}
+.lienzo .sello.on{transform:scale(1)}
+
+.resumen-look{margin:0 20px;padding:14px 18px;display:flex;align-items:center;
+  justify-content:space-between;gap:12px;border-radius:18px;background:var(--papel2)}
+.resumen-look .tt{font-size:12px;color:var(--gris)}
+.resumen-look .pp{font-size:22px;font-weight:700}
+.resumen-look .pp small{font-size:12px;color:var(--verde);font-weight:700;display:block}
+
+/* Selector de prendas */
+.pick .pf{height:66px;display:flex;align-items:center;justify-content:center}
+.pick .pf img.fig3d,.pick .pf svg{max-height:100%;max-width:100%;height:auto;width:auto;object-fit:contain}
+.pick .pn{display:block;font-size:11.5px;font-weight:600;line-height:1.3;margin-top:4px}
+.pick .pn small{display:block;color:var(--gris);font-weight:500}
+
+/* Renders 3D en el catalogo y la ficha */
+img.fig3d{display:block;object-fit:contain}
+.p-fig img.fig3d{width:100%;height:100%;padding:8px}
+.ficha-fig img.fig3d{max-width:88%;max-height:92%;width:auto;height:auto}
+.zfig img.fig3d,.pf img.fig3d{filter:drop-shadow(0 10px 14px rgba(20,18,16,.10))}
+
+@media (min-width:760px){
+  .lienzo{max-width:660px;margin-inline:auto}
+  .resumen-look{max-width:660px;margin-inline:auto}
+  .lienzo-sup .zona .zfig{height:150px}
+  .lienzo-inf .zona .zfig{height:210px}
+  .zona{min-height:210px}
+  .lienzo-inf .zona{min-height:270px}
+}
+
+
+/* ============ MONOGRAMA 3D DE MARCA ============
+   Se carga diferido y solo en conexiones rápidas (ver movimiento.js).
+   Mientras no llegue, no ocupa espacio ni descarga nada. */
+.marca3d{width:0;height:0;overflow:hidden;border-radius:50%;opacity:0;
+  transition:opacity .6s ease;margin:0 auto;flex-shrink:0}
+.marca3d.listo{width:132px;height:132px;opacity:1;margin:4px auto 14px;
+  box-shadow:0 14px 34px rgba(20,18,16,.16)}
+.marca3d video{width:100%;height:100%;object-fit:cover;display:block}
+@media (min-width:760px){.marca3d.listo{width:168px;height:168px}}
 
 </style>
 </head>
@@ -543,6 +612,7 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 <script src="analitica.js"></script>
 <script src="config.js"></script>
 <script src="catalogo.js"></script>
+<script src="renders3d.js"></script>
 <script src="supabase.js"></script>
 <script>window.sb = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;</script>
 <script src="store-app.js"></script>
