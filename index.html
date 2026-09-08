@@ -420,6 +420,85 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
   .envio-barra{max-width:1120px;margin-inline:auto}
 }
 
+
+/* ============ MOVIMIENTO Y PROFUNDIDAD ============
+   Se activa solo cuando el sistema NO pide reducir movimiento
+   (movimiento.js pone .con-motion en <html>). */
+
+/* Aparicion progresiva al desplazar */
+.con-motion .aparece{opacity:0;transform:translateY(18px);
+  transition:opacity .55s cubic-bezier(.22,1,.36,1),transform .55s cubic-bezier(.22,1,.36,1)}
+.con-motion .aparece.visible{opacity:1;transform:none}
+
+/* Entrada de cada vista */
+.con-motion #views.entra{animation:vistaEntra .42s cubic-bezier(.22,1,.36,1)}
+@keyframes vistaEntra{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* Profundidad 3D en tarjetas */
+.con-motion .tilt3d{transform-style:preserve-3d;will-change:transform;
+  transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s ease}
+.con-motion .tilt3d:hover{box-shadow:0 22px 46px rgba(20,18,16,.19)}
+.con-motion .tilt3d .p-fig,.con-motion .tilt3d .look-flat{
+  transition:transform .35s cubic-bezier(.22,1,.36,1);will-change:transform}
+.con-motion .p-card:active .p-fig{transform:scale(.97)}
+
+/* Brillo dorado que cruza la tarjeta al apuntarla */
+.con-motion .tilt3d .p-fig{position:relative;overflow:hidden}
+.con-motion .tilt3d .p-fig::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.30) 50%,transparent 62%);
+  transform:translateX(-120%);transition:transform .8s cubic-bezier(.22,1,.36,1)}
+.con-motion .tilt3d:hover .p-fig::after{transform:translateX(120%)}
+
+/* Parallax del encabezado */
+.con-motion .hero{will-change:transform}
+.con-motion .hero>*{transform:translateY(var(--par,0));opacity:var(--fade,1);
+  transition:opacity .25s linear}
+
+/* Monograma 3D de marca en el splash */
+#splash .sp-video{width:164px;height:164px;border-radius:50%;overflow:hidden;
+  opacity:0;transform:scale(.74);animation:spLogo .8s cubic-bezier(.22,1,.36,1) .05s forwards}
+#splash .sp-video video{width:100%;height:100%;object-fit:cover;display:block}
+
+/* Botones con reaccion tactil */
+.con-motion .btn-cart,.con-motion .btn-oro,.con-motion .btn-linea,.con-motion .mini-btn{
+  transition:transform .18s cubic-bezier(.34,1.6,.64,1),box-shadow .25s ease,background .25s ease}
+.con-motion .btn-cart:active,.con-motion .btn-oro:active,
+.con-motion .btn-linea:active,.con-motion .mini-btn:active{transform:scale(.965)}
+.con-motion .btn-oro:hover,.con-motion .btn-cart:hover{transform:translateY(-2px);
+  box-shadow:0 12px 26px rgba(20,18,16,.22)}
+
+/* Talla y color seleccionables con rebote */
+.con-motion .tl,.con-motion .sw{transition:transform .2s cubic-bezier(.34,1.6,.64,1),
+  border-color .2s ease,background .2s ease,color .2s ease}
+.con-motion .tl:active{transform:scale(.92)}
+.con-motion .tl.on{animation:pulsoTalla .34s cubic-bezier(.34,1.6,.64,1)}
+@keyframes pulsoTalla{0%{transform:scale(.9)}60%{transform:scale(1.07)}100%{transform:scale(1)}}
+
+/* Barra de envio gratis: el relleno avanza con brillo */
+.con-motion .envio-pista i{position:relative;overflow:hidden}
+.con-motion .envio-pista i::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+  animation:brilloBarra 2.2s ease-in-out infinite}
+@keyframes brilloBarra{0%{transform:translateX(-100%)}60%,100%{transform:translateX(220%)}}
+
+/* En escritorio la profundidad se nota mas */
+@media (min-width:760px){
+  .con-motion .grid{perspective:1200px}
+  .con-motion .carrusel{perspective:1200px}
+}
+
+
+/* ============ CINTA SUPERIOR ============ */
+.cinta{background:var(--tinta);color:var(--papel);overflow:hidden;position:relative;
+  font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase;font-weight:600}
+.cinta-pista{display:flex;gap:0;white-space:nowrap;will-change:transform}
+.cinta-pista span{padding:9px 26px;position:relative;flex:0 0 auto}
+.cinta-pista span::after{content:"·";position:absolute;right:-3px;opacity:.45}
+.con-motion .cinta-pista{animation:cintaCorre 26s linear infinite}
+@keyframes cintaCorre{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.cinta:hover .cinta-pista{animation-play-state:paused}
+@media (min-width:760px){.cinta{text-align:center}.cinta-pista{justify-content:center}}
+
 </style>
 </head>
 <body>
@@ -435,6 +514,14 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 </div>
 
 <div id="app">
+  <div class="cinta" id="cinta" aria-label="Información de envíos">
+  <div class="cinta-pista">
+    <span>Envíos a todo México</span>
+    <span>Entrega local en Mexicali</span>
+    <span>Envío gratis desde $500</span>
+    <span>Compra por prenda o arma tu outfit</span>
+  </div>
+</div>
   <header class="top" id="topbar">
     <div class="logo-r" onclick="go('home')">R<em>O</em>MA</div>
     <div class="top-sp"></div>
@@ -459,6 +546,7 @@ p.subtitulo{color:var(--gris);font-size:13.5px;padding:0 20px 8px}
 <script src="supabase.js"></script>
 <script>window.sb = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;</script>
 <script src="store-app.js"></script>
+<script src="movimiento.js" defer></script>
 <script src="admin.js"></script>
 <script>
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
