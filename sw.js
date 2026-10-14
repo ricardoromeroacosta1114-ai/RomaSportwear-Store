@@ -1,4 +1,4 @@
-const CACHE = 'oma-store-v1';
+const CACHE = 'oma-store-v2';
 /* Lo indispensable para abrir la tienda sin conexión. Lo demás (imágenes de
    cada color, capas del maniquí) se guarda la primera vez que se ve. */
 const ASSETS = ['./','./index.html','./oma.css','./store-app.js','./maniqui.js','./tinte.js','./config.js','./catalogo.js',

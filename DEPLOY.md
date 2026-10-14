@@ -24,7 +24,7 @@ El pago con tarjeta no funciona en local (necesita las funciones de Netlify): se
 ## 2. Pruebas
 
 ```
-node scripts/pruebas.js            la tienda (75 comprobaciones)
+node scripts/pruebas.js            la tienda (79 comprobaciones)
 node scripts/pruebas-servidor.js   cobro y aviso de pago (42 comprobaciones)
 node herramientas/capturas.js <carpeta> movil|escritorio claro|oscuro
 ```
@@ -65,7 +65,8 @@ Son ilustraciones 3D, y así se describen en el sitio; no son fotografías del p
 
 - `prendas/base/*.webp` y `maniqui/capa-*.webp`: una sola imagen en gris por tipo de prenda. El color se aplica encima con el tono exacto del inventario (`tinte.js`), así que **cualquier color nuevo funciona sin generar otra imagen**.
 - `prendas/<prenda>.webp`: esa misma base ya teñida, una por color, para la tienda y para compartir.
-- `herramientas/fuentes/` guarda los originales (pesan 35 MB y no se suben al repositorio).
+- `escenas/`: los escenarios 3D donde se para el maniquí (arco de noche y de día, base con foco) y la seda del cierre de la portada. Se generaron con Higgsfield; no muestran ninguna prenda.
+- `herramientas/fuentes/` guarda los originales (pesan unos 70 MB y no se suben al repositorio).
 
 Una prenda nueva con otra silueta (short, top, legging recto) sí necesita su imagen base y su capa de maniquí: `herramientas/prepara-bases.js`.
 

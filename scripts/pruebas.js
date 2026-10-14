@@ -101,6 +101,13 @@ chk("todos los colores traen su tono", run("MODELOS.every(m=>/^#[0-9A-Fa-f]{6}$/
 chk("las tres capas del maniquí existen", ["maniqui", "capa-jacket", "capa-playera", "capa-legging-campana"].every(a => existe("maniqui/" + a + ".webp")));
 chk("el maniquí se describe para lectores de pantalla", /Maniquí blanco con jacket negro/.test(run("altOutfit({capa:'jacket-negro'})")));
 
+console.log("\n=== PORTADA ===");
+const portada = run("viewHome()");
+chk("los percheros muestran las 34 prendas", (portada.match(/class="percha"/g) || []).length === 34, (portada.match(/class="percha"/g) || []).length);
+chk("el probador trae los 5 looks, cada uno en su base", (portada.match(/escena--pedestal/g) || []).length === 5);
+chk("las escenas del maniquí existen", ["arco-noche", "arco-noche-ancho", "arco-dia", "pedestal-noche", "seda-noche"].every(a => existe("escenas/" + a + ".webp")));
+chk("la portada no promete nada que no esté configurado", !/garant|exclusiv|marca registrada|24 horas/i.test(portada));
+
 console.log("\n=== PEDIDO POR WHATSAPP ===");
 run("carrito=[{sku:'LEGGING-CAMPANA-NEGRO-M',cant:1}]; entrega='local'; pagoSel='transferencia'; ordenes=[]; puntos=0;");
 Object.assign(campos, { ckNombre: "María Pérez", ckWhats: "6861234567", ckCorreo: "maria@ejemplo.com", ckDir: "Av. Reforma 100", ckCol: "Centro", ckRef: "Portón blanco", ckNotas: "" });

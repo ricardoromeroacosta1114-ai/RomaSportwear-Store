@@ -214,7 +214,7 @@ let maniquiVisto=false, secuenciaHecha=false;
 function maniquiHtml(slots,o){
   o=o||{};
   const sec=o.secuencia&&!secuenciaHecha;
-  return `<div class="escena${maniquiVisto?"":" cargando"}"><canvas class="maniqui"${o.id?` id="${o.id}"`:""} width="644" height="1920"
+  return `<div class="escena${o.clase?" "+o.clase:""}${maniquiVisto?"":" cargando"}"><canvas class="maniqui"${o.id?` id="${o.id}"`:""} width="644" height="1920"
     data-maniqui='${JSON.stringify(prendasDe(slots))}'${o.escala?` data-escala="${o.escala}"`:""}${sec?' data-secuencia="1"':""}
     role="img" aria-label="${esc(altOutfit(slots))}"></canvas></div>`;
 }
@@ -363,11 +363,12 @@ function render(){
   const V=Object.assign({home:viewHome,tienda:viewTienda,producto:viewProducto,armador:viewArmador,looks:viewLooks,
     carrito:viewCarrito,checkout:viewCheckout,confirmacion:viewConfirmacion,pagoMP:viewPagoMP,perfil:viewPerfil,pedidos:viewPedidos}, window.EXTRA_VIEWS||{});
   const vistas=$("views");
-  if(vistas) vistas.innerHTML=`<div class="view">${(V[vista]||viewHome)()}</div>`;
+  if(vistas) vistas.innerHTML=`<div class="view${vista==="home"?" view-portada":""}">${(V[vista]||viewHome)()}</div>`;
   if(document.body&&document.body.classList) document.body.classList.toggle("con-total",vista==="armador");
   if(document.querySelectorAll) document.querySelectorAll(".cab-nav [data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===vista));
   pintaBadge(false);
   montaLienzos();
+  montaEfectos();
 }
 function abreMenu(){ const m=$("menu"); if(m&&m.showModal&&!m.open) m.showModal(); }
 function cierraMenu(){ const m=$("menu"); if(m&&m.open&&m.close) m.close(); }
@@ -384,7 +385,7 @@ function pintaAviso(){
 function cardProducto(m){
   const ago=!hayStock(m), pz=piezasTotales(m);
   return `<button class="tarjeta${ago?" agotada":""}" onclick="abre(this,'${m.id}')">
-    <span class="tarjeta-fig">${ago?'<span class="etq">Agotado</span>':""}${figuraDe(m,0)}</span>
+    <span class="tarjeta-fig">${ago?'<span class="etq">Agotado</span>':""}${figuraDe(m,0)}${ago?"":`<span class="tarjeta-tallas" aria-hidden="true">${tallasDisp(m).map(t=>`<span>${t}</span>`).join("")}</span>`}</span>
     <span class="tarjeta-nom">${esc(m.nombre)}</span>
     <span class="tarjeta-col"><i class="punto" style="background:${m.hex}"></i>${esc(m.color)}</span>
     <span class="tarjeta-pre">${peso(m.precio)}${m.antes?`<s>${peso(m.antes)}</s>`:""}</span>
@@ -408,8 +409,9 @@ function verLookPortada(i){
   const L=looksVivos()[i]; if(!L) return;
   lookPortada=i;
   pintaManiqui($("mqPortada"),prendasDe(L.slots));
-  if(document.querySelectorAll) document.querySelectorAll(".portada-looks .trio").forEach((b,k)=>b.setAttribute("aria-pressed",k===i?"true":"false"));
+  if(document.querySelectorAll) document.querySelectorAll(".sala-looks .trio").forEach((b,k)=>b.setAttribute("aria-pressed",k===i?"true":"false"));
   const cv=$("mqPortada"); if(cv&&cv.setAttribute) cv.setAttribute("aria-label",altOutfit(L.slots));
+  const n=$("lookNombre"); if(n) n.textContent=L.nombre;
 }
 function abrirLookEnArmador(i){
   const L=looksVivos()[i]; if(!L) return;
@@ -429,7 +431,7 @@ function barraEnvioGratis(){
 }
 
 function pieTienda(){
-  return `<footer class="pie">
+  return `<footer class="pie noche">
     <div><img class="logo-claro" src="/marca/oma-logo-claro.webp" width="1100" height="491" alt="OMA Sportwear" loading="lazy">
       <img class="logo-oscuro" src="/marca/oma-logo-oscuro.webp" width="1100" height="535" alt="OMA Sportwear" loading="lazy"></div>
     <nav class="pie-links" aria-label="Información">
@@ -446,71 +448,142 @@ function fraseColores(fs){
   const p=fs.map((f,i)=>`${f.modelos.length} ${i===0?"colores de ":"de "}${f.nombre.toLowerCase()}`);
   return p.length>1 ? p.slice(0,-1).join(", ")+" y "+p[p.length-1] : (p[0]||"");
 }
+let introHasta=0;
 function viewHome(){
-  const C=CFG(), fs=familias(), lv=looksVivos();
+  const C=CFG(), fs=familias(), lv=looksVivos(), pct=C.outfitDiscountPct||0;
   if(lookPortada>=lv.length) lookPortada=0;
   const inicial=lv[lookPortada] ? lv[lookPortada].slots : {};
-  const otro=lv[1]||lv[0];
+  if(!introHasta) introHasta=Date.now()+2500;
+  const intro=Date.now()<introHasta;
+  const sinCentavos=n=>peso(n).replace(".00","");
+  const cinta=["Entrega local en Mexicali","Envíos a todo México",
+    C.freeShippingFrom>0?"Envío gratis desde "+sinCentavos(C.freeShippingFrom):"",
+    pct>0?"Arma tu outfit y ahorra "+pct+" %":"",
+    C.mercadoPagoEnabled?"Paga con tarjeta, transferencia o efectivo":"Paga con transferencia o efectivo"].filter(Boolean);
+  const precioFam=f=>{ const p=f.modelos.map(m=>m.precio); return Math.min(...p)===Math.max(...p) ? peso(p[0]) : "Desde "+peso(Math.min(...p)); };
+  const formasPago=C.mercadoPagoEnabled?3:2;
   return `
-  <section class="portada">
-    <div class="portada-txt">
-      <h1 class="display" tabindex="-1">Ropa deportiva para moverte a tu manera.</h1>
-      <p class="entrada">${fs.length?fraseColores(fs).replace(/^./,c=>c.toUpperCase())+". Llévalos por prenda o arma tu outfit completo.":"Llévala por prenda o arma tu outfit completo."}</p>
-      <div class="acciones">
-        <button class="btn" onclick="go('tienda')">Ver la colección</button>
-        <button class="btn btn-claro" onclick="go('armador')">Armar mi outfit</button>
+  <section class="sala noche${intro?" sala--intro":""}" aria-label="Portada">
+    <div class="sala-marco">
+      <picture>
+        <source media="(min-width:1100px)" srcset="/escenas/arco-noche-ancho.webp" width="2200" height="1228">
+        <img class="sala-fondo" src="/escenas/arco-noche.webp" width="1200" height="1607" alt="" fetchpriority="high" decoding="async">
+      </picture>
+      ${maniquiHtml(inicial,{id:"mqPortada",secuencia:true,clase:"escena--sala"})}
+    </div>
+    <div class="sala-txt">
+      <p class="ceja" style="--i:0">OMA Sportwear, nueva colección</p>
+      <h1 class="display" tabindex="-1" style="--i:1"><span>Hecha para moverte,</span><span>pensada para lucir.</span></h1>
+      <p class="entrada" style="--i:2">${fs.length?fraseColores(fs).replace(/^./,c=>c.toUpperCase())+".":""} Vístelos en el maniquí antes de comprarlos.</p>
+      <div class="sala-acciones" style="--i:3">
+        <button class="btn-champ" onclick="catFiltro='Todo';go('tienda')">Descubrir la colección</button>
+        <button class="btn-fantasma" onclick="go('armador')">Armar mi outfit</button>
       </div>
     </div>
-    <div class="portada-escena">
-      ${maniquiHtml(inicial,{id:"mqPortada",secuencia:true})}
-    </div>
-    ${lv.length>1?`<div class="portada-looks" role="group" aria-label="Probar otra combinación">
-      <span class="nota">Prueba otra combinación</span>
+    ${lv.length>1?`<div class="sala-looks" role="group" aria-label="Probar otro look en el maniquí">
+      <span class="ceja">Prueba un look</span>
       ${lv.map((L,i)=>`<button class="trio" aria-pressed="${i===lookPortada}" aria-label="${esc(L.nombre)}" title="${esc(L.nombre)}" onclick="verLookPortada(${i})">${trioHtml(L.slots)}</button>`).join("")}
+      <span class="look-nombre" id="lookNombre" aria-live="polite">${esc(lv[lookPortada].nombre)}</span>
     </div>`:""}
   </section>
 
-  <dl class="franja">
-    <div><dt>Entrega local en Mexicali</dt><dd>${C.localDeliveryCost>0?peso(C.localDeliveryCost):"Gratis"}</dd></div>
-    <div><dt>Envío a todo México</dt><dd>${C.nationalShippingCost>0?peso(C.nationalShippingCost):"Gratis"}</dd></div>
-    ${C.freeShippingFrom>0?`<div><dt>Envío gratis en compras desde</dt><dd>${peso(C.freeShippingFrom)}</dd></div>`:""}
-  </dl>
+  <div class="cinta"><div class="cinta-pista">${[...cinta,...cinta].map((t,k)=>`<span${k>=cinta.length?' aria-hidden="true"':""}>${esc(t)}</span>`).join("")}</div></div>
 
-  <section class="bloque">
-    <header class="bloque-cab"><h2>La colección</h2><button class="enlace" onclick="catFiltro='Todo';go('tienda')">Ver las ${MODELOS.length} prendas</button></header>
-    <div class="familias">
-      ${fs.map(f=>{
-        const sel=modelo(famColor[f.nombre])||f.modelos.find(hayStock)||f.modelos[0];
-        return `<article class="familia" data-id="${sel.id}">
-          <button class="familia-fig" onclick="abre(this,this.parentElement.dataset.id)" aria-label="Ver ${esc(f.nombre)}">${figuraDe(sel,0)}</button>
-          <div class="familia-pie"><h3>${esc(f.nombre)}</h3><span class="precio">${peso(sel.precio)}</span></div>
-          <p class="nota">${f.modelos.length} colores, tallas ${tallasDe(f.modelos[0]).join(", ")}</p>
-          <div class="muestras">${f.modelos.map(m=>`<button class="sw chica${hayStock(m)?"":" agotada"}" style="background:${m.hex}" aria-pressed="${m.id===sel.id}"
-            aria-label="${esc(m.color)}" title="${esc(m.color)}" onclick="eligeFamilia(this,'${m.id}')"></button>`).join("")}</div>
-        </article>`;
-      }).join("")}
-    </div>
+  <section class="coleccion" aria-labelledby="tColeccion">
+    <header class="sec-cab" data-rev>
+      <p class="ceja">La colección</p>
+      <h2 class="sec-titulo" id="tColeccion">${fs.length} prendas, ${MODELOS.length} colores.</h2>
+      <button class="enlace-mayus" onclick="catFiltro='Todo';go('tienda')">Ver toda la tienda</button>
+    </header>
+    ${fs.map(f=>`<div class="riel" data-rev>
+      <div class="riel-cab">
+        <h3 class="riel-nombre">${esc(f.nombre)}</h3>
+        <p class="riel-precio">${precioFam(f)}</p>
+        <p class="riel-datos">${f.modelos.length} colores, tallas ${tallasDe(f.modelos[0]).join(" ")}</p>
+        <div class="riel-flechas"><button class="ico" onclick="desliza(this,-1)" aria-label="Ver colores anteriores de ${esc(f.nombre)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6"/></svg></button><button class="ico" onclick="desliza(this,1)" aria-label="Ver más colores de ${esc(f.nombre)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></button></div>
+      </div>
+      <ul class="riel-pista" aria-label="Colores de ${esc(f.nombre)}">
+        ${f.modelos.map(m=>`<li><button class="percha" onclick="abre(this,'${m.id}')" aria-label="${esc(m.nombre+" "+m.color)}, ${peso(m.precio)}${hayStock(m)?"":", agotado"}">
+          <span class="percha-fig">${figuraDe(m,0)}</span>
+          <span class="percha-col"><i class="punto" style="background:${m.hex}"></i>${esc(m.color)}</span></button></li>`).join("")}
+      </ul>
+    </div>`).join("")}
   </section>
 
-  ${otro?`<section class="invita">
-    <div class="invita-escena">${maniquiHtml(otro.slots,{escala:0.6})}</div>
-    <div class="invita-txt">
-      <h2>Vístelo antes de comprarlo</h2>
-      <p class="entrada">En el armador cada prenda cambia de color sobre el maniquí, con el tono real de la tela. Con jacket o playera más legging, el outfit lleva ${C.outfitDiscountPct} % de descuento.</p>
-      <button class="btn" onclick="go('armador')">Armar mi outfit</button>
-    </div>
+  ${lv.length?`<section class="lookbook noche" aria-labelledby="tLooks">
+    <header class="sec-cab" data-rev>
+      <p class="ceja">El probador</p>
+      <h2 class="sec-titulo" id="tLooks">Looks listos para llevar.</h2>
+      <p>Armados con piezas que hay hoy en tienda.${pct>0?" Jacket o playera más legging: "+pct+" % menos.":""}</p>
+    </header>
+    <ul class="lookbook-pista">
+      ${lv.map((L,i)=>{ const p=lookPrecio(L.slots), completo=!!((L.slots.arriba||L.slots.capa)&&L.slots.abajo), con=completo&&pct>0?p*(1-pct/100):p;
+        return `<li class="look-carta" data-rev style="--i:${i}">
+          ${maniquiHtml(L.slots,{escala:0.5,clase:"escena--pedestal"})}
+          <h3>${esc(L.nombre)}</h3>
+          <p class="look-precio">${con<p?`<s>${peso(p)}</s><b>${peso(con)}</b>`:peso(p)}</p>
+          <button class="btn-fantasma" onclick="abrirLookEnArmador(${i})">Probar este look</button>
+        </li>`;}).join("")}
+    </ul>
   </section>`:""}
+
+  <section class="servicio" aria-label="Entregas y pagos">
+    <div data-rev style="--i:0"><span class="servicio-cifra">${C.localDeliveryCost>0?sinCentavos(C.localDeliveryCost):"Gratis"}</span>
+      <h3>Entrega local</h3><p>En Mexicali. También puedes recogerlo sin costo: ${esc(C.pickupAddress||"")}.</p></div>
+    <div data-rev style="--i:1"><span class="servicio-cifra">${C.nationalShippingCost>0?sinCentavos(C.nationalShippingCost):"Gratis"}</span>
+      <h3>Envíos a todo México</h3><p>Enviamos a cualquier estado del país.</p></div>
+    ${C.freeShippingFrom>0?`<div data-rev style="--i:2"><span class="servicio-cifra">Desde ${sinCentavos(C.freeShippingFrom)}</span>
+      <h3>Envío gratis</h3><p>En compras desde ${sinCentavos(C.freeShippingFrom)}, ya con descuentos.</p></div>`:""}
+    <div data-rev style="--i:3"><span class="servicio-cifra">${formasPago} formas</span>
+      <h3>Formas de pago</h3><p>${C.mercadoPagoEnabled?"Tarjeta con Mercado Pago, transferencia o efectivo al recibir. OMA no ve los datos de tu tarjeta.":"Transferencia o efectivo al recibir."}</p></div>
+  </section>
+
+  <section class="manifiesto noche">
+    <div class="manifiesto-in" data-rev>
+      <p class="ceja">Arma tu outfit</p>
+      <h2>Tú eliges cada pieza.<br>El maniquí te la muestra.</h2>
+      <p>${MODELOS.length} colores para combinar como quieras, cada uno con el tono de su tela.</p>
+      <button class="btn-champ" onclick="go('armador')">Entrar al probador</button>
+    </div>
+  </section>
   ${pieTienda()}`;
 }
-/* Cambiar el color de una familia en la portada, sin repintar la página. */
-function eligeFamilia(btn,id){
-  const m=modelo(id); if(!m) return;
-  famColor[m.nombre]=id;
-  const art=btn.closest&&btn.closest(".familia"); if(!art) return;
-  art.dataset.id=id;
-  const fig=art.querySelector(".familia-fig"); if(fig){ fig.innerHTML=figuraDe(m,0); montaLienzos(); }
-  const pr=art.querySelector(".precio"); if(pr) pr.textContent=peso(m.precio);
-  art.querySelectorAll(".sw").forEach(b=>b.setAttribute("aria-pressed",b===btn?"true":"false"));
+
+/* Flechas del perchero (en computadora, donde no se desliza con el dedo). */
+function desliza(btn,dir){
+  const p=btn.closest&&btn.closest(".riel")&&btn.closest(".riel").querySelector(".riel-pista");
+  if(p&&p.scrollBy) p.scrollBy({left:dir*p.clientWidth*0.8,behavior:quieto()?"auto":"smooth"});
+}
+
+/* ---------- portada: encabezado transparente, profundidad y apariciones ---------- */
+let rafScroll=false, observador=null;
+function pintaCabecera(){
+  const b=document.body; if(!b||!b.classList) return;
+  const s=vista==="home"&&document.querySelector&&document.querySelector(".sala");
+  b.classList.toggle("en-sala",!!(s&&window.scrollY<s.offsetHeight-70));
+}
+function profundidad(){
+  if(quieto()||!document.querySelector) return;
+  const y=window.scrollY||0, alto=window.innerHeight||800;
+  const marco=document.querySelector(".sala-marco");
+  if(marco&&marco.style&&y<1600) marco.style.setProperty("--par",(y*0.16).toFixed(1)+"px");
+  const m=document.querySelector(".manifiesto");
+  if(m&&m.getBoundingClientRect&&m.style){ const r=m.getBoundingClientRect(); if(r.bottom>0&&r.top<alto) m.style.setProperty("--par",((r.top+r.height/2-alto/2)*-0.1).toFixed(1)+"px"); }
+}
+if(window.addEventListener) window.addEventListener("scroll",()=>{
+  if(rafScroll) return; rafScroll=true;
+  requestAnimationFrame(()=>{ rafScroll=false; pintaCabecera(); profundidad(); });
+},{passive:true});
+/* Las secciones aparecen al llegar a ellas. Sin IntersectionObserver, o con
+   movimiento reducido, se muestran de una vez. */
+function montaEfectos(){
+  pintaCabecera();
+  const v=$("views"); if(!v||!v.querySelectorAll) return;
+  const els=v.querySelectorAll("[data-rev]");
+  if(typeof IntersectionObserver==="undefined"||quieto()){ els.forEach(e=>e.classList.add("visto")); return; }
+  document.documentElement.classList.add("fx");
+  if(!observador) observador=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("visto"); observador.unobserve(e.target); } }),{rootMargin:"0px 0px -6% 0px",threshold:0.06});
+  els.forEach(e=>observador.observe(e));
 }
 
 function viewTienda(){

@@ -56,8 +56,8 @@ const VISTAS = {
     const entera = !process.env.VENTANA && nombre !== "menu" && !nombre.startsWith("armador");
     if (entera) {                                                      // que carguen las imágenes de abajo
       await p.evaluate(async () => {
-        for (let y = 0; y < document.documentElement.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); }
-        window.scrollTo(0, 0);
+        for (let y = 0; y < document.documentElement.scrollHeight; y += 600) { window.scrollTo({ top: y, behavior: "instant" }); await new Promise(r => setTimeout(r, 120)); }
+        window.scrollTo({ top: 0, behavior: "instant" });
       });
       await new Promise(r => setTimeout(r, 700));
     }
