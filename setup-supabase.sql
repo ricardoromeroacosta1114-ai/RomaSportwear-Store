@@ -1,5 +1,7 @@
 -- ============================================================
--- ROMA Sportwear · Preparación de Supabase
+-- OMA Sportwear · Preparación de Supabase (tablas propias de la tienda)
+-- Ya está aplicado en el proyecto en uso. La tabla `productos` quedó sin uso:
+-- las prendas vienen del inventario del punto de venta (CONEXION-INVENTARIO.md).
 -- Pega TODO este archivo en: Supabase → SQL Editor → Run
 -- ============================================================
 

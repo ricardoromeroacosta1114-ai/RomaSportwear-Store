@@ -2,3 +2,20 @@
   command = "node scripts/build.js"
   publish = "."
   functions = "netlify/functions"
+
+# Lo que sirve para construir el sitio no se publica.
+[[redirects]]
+  from = "/herramientas/*"
+  to = "/404.html"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/scripts/*"
+  to = "/404.html"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/setup-supabase.sql"
+  to = "/404.html"
+  status = 404
+  force = true

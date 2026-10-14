@@ -1,7 +1,6 @@
 {
   "_instrucciones": "Datos REALES del negocio. Todo lo que este vacio aparece marcado como PENDIENTE en el sitio y NO se inventa. Llena cada campo y vuelve a publicar.",
-
-  "nombre": "ROMA Sportwear",
+  "nombre": "OMA Sportwear",
   "ciudad": "Mexicali, Baja California",
   "whatsapp": "526633183894",
   "correo": "",
@@ -9,7 +8,6 @@
   "facebook": "",
   "horarioAtencion": "",
   "tiempoRespuesta": "",
-
   "envios": {
     "entregaLocalCiudades": "Mexicali",
     "costoLocal": 100,
@@ -21,7 +19,6 @@
     "diasPreparacion": "",
     "rastreo": ""
   },
-
   "cambios": {
     "aceptaCambios": null,
     "diasParaCambio": null,
@@ -30,14 +27,12 @@
     "quienPagaEnvioCambio": "",
     "comoSolicitar": ""
   },
-
   "recoleccion": {
     "activa": true,
     "lugar": "Bazar Vintage Clothing",
     "horario": "Viernes a domingo de 5:30 p.m. a 11:00 p.m.",
     "direccion": ""
   },
-
   "legal": {
     "razonSocial": "",
     "rfc": "",

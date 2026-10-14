@@ -7,7 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 const raiz = path.join(__dirname, "..");
-const { SITIO, estilos, pie, esc } = require("./genera-paginas.js");
+const { SITIO, estilos, pie, cabecera, cabezaComun, esc } = require("./genera-paginas.js");
 const neg = JSON.parse(fs.readFileSync(path.join(raiz, "data/negocio.json"), "utf8"));
 const fichas = JSON.parse(fs.readFileSync(path.join(raiz, "data/fichas.json"), "utf8"));
 
@@ -19,41 +19,41 @@ const dato = (v, queFalta) => vacio(v) ? PEND(queFalta) : esc(v);
 function envoltura(o) {
   const ld = o.jsonld ? '<script type="application/ld+json">' + JSON.stringify(o.jsonld) + "</script>" : "";
   return `<!doctype html>
-<html lang="es">
+<html lang="es-MX">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(o.titulo)} | ROMA Sportwear</title>
+<title>${esc(o.titulo)} | OMA Sportwear</title>
 <meta name="description" content="${esc(o.desc)}">
 <link rel="canonical" href="${SITIO}${o.ruta}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="ROMA Sportwear">
+<meta property="og:site_name" content="OMA Sportwear">
 <meta property="og:locale" content="es_MX">
-<meta property="og:title" content="${esc(o.titulo)} | ROMA Sportwear">
+<meta property="og:title" content="${esc(o.titulo)} | OMA Sportwear">
 <meta property="og:description" content="${esc(o.desc)}">
 <meta property="og:url" content="${SITIO}${o.ruta}">
-<meta property="og:image" content="${SITIO}/icons/icon-512.png">
+<meta property="og:image" content="${SITIO}/marca/oma-compartir.jpg">
 <meta name="twitter:card" content="summary">
-<link rel="icon" href="${SITIO}/icons/icon-192.png">
-<link href="${SITIO}/fonts/fonts.css" rel="stylesheet">
+${cabezaComun()}
 ${ld}
 <style>${estilos()}
 .envoltura{max-width:760px}
-h1{margin-bottom:4px}
+h1{margin-bottom:14px}
 p,li{font-size:15px}
-.pend{display:inline-block;background:#FFF4D6;color:#7A5B00;border:1px solid #E8CE85;border-radius:8px;padding:2px 8px;font-size:13px;font-weight:600}
+.pend{display:inline-block;background:#FFF4D6;color:#7A5B00;border:1px solid #E8CE85;border-radius:2px;padding:1px 8px;font-size:13px;font-weight:600}
 @media (prefers-color-scheme:dark){.pend{background:#3A2F12;color:#F0D68A;border-color:#5C4A1E}}
-.aviso{background:var(--papel2);border-left:3px solid var(--oro);border-radius:12px;padding:14px 16px;margin:18px 0;font-size:14px}
-dl{margin:0}dt{font-weight:700;margin-top:16px}dd{margin:4px 0 0}
+.aviso{background:var(--panel);border-left:2px solid var(--acento);padding:14px 16px;margin:18px 0;font-size:14px}
+dl{margin:0}dt{font-weight:600;margin-top:18px}dd{margin:4px 0 0;color:var(--texto2)}
 </style>
 </head>
 <body>
-<div class="envoltura">
-  <nav class="migas" aria-label="Ruta"><a href="${SITIO}/">Inicio</a> &rsaquo; ${esc(o.titulo)}</nav>
+${cabecera()}
+<main class="envoltura">
+  <nav class="migas" aria-label="Ruta"><a href="/">Tienda</a> / ${esc(o.titulo)}</nav>
   <h1>${esc(o.titulo)}</h1>
   ${o.cuerpo}
   ${pie()}
-</div>
+</main>
 </body>
 </html>`;
 }
@@ -71,7 +71,7 @@ const correo = vacio(neg.correo) ? PEND("correo de contacto") : `<a href="mailto
 const e = neg.envios;
 escribe("/envios/", envoltura({
   titulo: "Envíos", ruta: "/envios/",
-  desc: "Costos y tiempos de entrega de ROMA Sportwear: entrega local en Mexicali y envío a todo México.",
+  desc: "Costos y tiempos de entrega de OMA Sportwear: entrega local en Mexicali y envío a todo México.",
   cuerpo: `
   <p>Hacemos entrega local en ${dato(e.entregaLocalCiudades, "ciudades de entrega local")} y enviamos a todo México.</p>
   <h2>Costos</h2>
@@ -101,9 +101,9 @@ const c = neg.cambios;
 const faltaPolitica = vacio(c.aceptaCambios) || vacio(c.diasParaCambio) || vacio(c.condiciones);
 escribe("/cambios/", envoltura({
   titulo: "Cambios y devoluciones", ruta: "/cambios/",
-  desc: "Política de cambios y devoluciones de ROMA Sportwear.",
+  desc: "Política de cambios y devoluciones de OMA Sportwear.",
   cuerpo: `
-  ${faltaPolitica ? `<div class="aviso"><b>Esta política todavía no está definida.</b> ROMA aún no ha publicado sus condiciones de cambio y devolución. Escríbenos por ${wa} y te confirmamos tu caso en particular.</div>` : ""}
+  ${faltaPolitica ? `<div class="aviso"><b>Esta política todavía no está definida.</b> OMA aún no ha publicado sus condiciones de cambio y devolución. Escríbenos por ${wa} y te confirmamos tu caso en particular.</div>` : ""}
   <dl>
     <dt>¿Se aceptan cambios?</dt><dd>${vacio(c.aceptaCambios) ? PEND("definir si aceptas cambios") : (c.aceptaCambios ? "Sí." : "No.")}</dd>
     <dt>Plazo para solicitar un cambio</dt><dd>${vacio(c.diasParaCambio) ? PEND("definir cuántos días") : esc(c.diasParaCambio) + " días naturales desde que recibes tu pedido."}</dd>
@@ -119,13 +119,13 @@ escribe("/cambios/", envoltura({
 const conMedidas = Object.entries(fichas).filter(([, f]) => f.guiaTallasCm && Object.keys(f.guiaTallasCm).length);
 escribe("/guia-de-tallas/", envoltura({
   titulo: "Guía de tallas", ruta: "/guia-de-tallas/",
-  desc: "Cómo elegir tu talla en ROMA Sportwear.",
+  desc: "Cómo elegir tu talla en OMA Sportwear.",
   cuerpo: `
   <p>Todas nuestras prendas se manejan en tallas <b>S</b>, <b>M</b> y <b>L</b>.</p>
   ${conMedidas.length ? conMedidas.map(([n, f]) => `
     <h2>${esc(n)}</h2>
     <table><tbody>${Object.entries(f.guiaTallasCm).map(([t, med]) => `<tr><th>${esc(t)}</th><td>${esc(med)}</td></tr>`).join("")}</tbody></table>`).join("")
-    : `<div class="aviso"><b>Las medidas en centímetros todavía no están publicadas.</b> No queremos darte medidas inventadas: en cuanto ROMA tome las medidas reales de cada prenda aparecerán aquí. Mientras tanto, escríbenos por ${wa} y te decimos qué talla te queda mejor.</div>`}
+    : `<div class="aviso"><b>Las medidas en centímetros todavía no están publicadas.</b> No queremos darte medidas inventadas: en cuanto OMA tome las medidas reales de cada prenda aparecerán aquí. Mientras tanto, escríbenos por ${wa} y te decimos qué talla te queda mejor.</div>`}
   <h2>¿Entre dos tallas?</h2>
   <p>Escríbenos por ${wa} con tu estatura y medidas y te orientamos sin compromiso.</p>`
 }));
@@ -140,7 +140,7 @@ const faqs = [
 ];
 escribe("/preguntas-frecuentes/", envoltura({
   titulo: "Preguntas frecuentes", ruta: "/preguntas-frecuentes/",
-  desc: "Dudas comunes sobre compras, envíos, tallas y pagos en ROMA Sportwear.",
+  desc: "Dudas comunes sobre compras, envíos, tallas y pagos en OMA Sportwear.",
   jsonld: {
     "@context": "https://schema.org", "@type": "FAQPage",
     mainEntity: faqs.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } }))
@@ -149,12 +149,12 @@ escribe("/preguntas-frecuentes/", envoltura({
   <p style="margin-top:22px">¿Tu duda no está aquí? Escríbenos por ${wa}.</p>`
 }));
 
-/* ---------------- SOBRE ROMA ---------------- */
-escribe("/sobre-roma/", envoltura({
-  titulo: "Sobre ROMA", ruta: "/sobre-roma/",
-  desc: "ROMA Sportwear: ropa deportiva para mujer en Mexicali con envíos a todo México.",
+/* ---------------- SOBRE OMA ---------------- */
+escribe("/sobre-oma/", envoltura({
+  titulo: "Sobre OMA", ruta: "/sobre-oma/",
+  desc: "OMA Sportwear: ropa deportiva para mujer en Mexicali con envíos a todo México.",
   cuerpo: `
-  <p>ROMA Sportwear es una tienda de ropa deportiva para mujer con base en ${esc(neg.ciudad)}. Vendemos por prenda y también armamos outfits completos.</p>
+  <p>OMA Sportwear es una tienda de ropa deportiva para mujer con base en ${esc(neg.ciudad)}. Vendemos por prenda y también armamos outfits completos.</p>
   <p>Puedes comprar en línea con entrega local en ${esc(e.entregaLocalCiudades || "Mexicali")} o envío a todo México.</p>
   <h2>Cómo contactarnos</h2>
   <table><tbody>
@@ -168,7 +168,7 @@ escribe("/sobre-roma/", envoltura({
 /* ---------------- CONTACTO ---------------- */
 escribe("/contacto/", envoltura({
   titulo: "Contacto", ruta: "/contacto/",
-  desc: "Contacta a ROMA Sportwear por WhatsApp, correo o redes sociales.",
+  desc: "Contacta a OMA Sportwear por WhatsApp, correo o redes sociales.",
   cuerpo: `
   <table><tbody>
     <tr><th>WhatsApp</th><td>${wa}</td></tr>
@@ -184,9 +184,9 @@ escribe("/contacto/", envoltura({
 /* ---------------- TERMINOS ---------------- */
 escribe("/terminos/", envoltura({
   titulo: "Términos y condiciones", ruta: "/terminos/",
-  desc: "Términos y condiciones de uso y compra en ROMA Sportwear.",
+  desc: "Términos y condiciones de uso y compra en OMA Sportwear.",
   cuerpo: `
-  <div class="aviso">Estos términos describen cómo opera la tienda hoy. Los datos fiscales y la razón social están pendientes de que ROMA los proporcione; no se han inventado.</div>
+  <div class="aviso">Estos términos describen cómo opera la tienda hoy. Los datos fiscales y la razón social están pendientes de que OMA los proporcione; no se han inventado.</div>
   <h2>1. Quién vende</h2>
   <table><tbody>
     <tr><th>Nombre comercial</th><td>${esc(neg.nombre)}</td></tr>
@@ -199,9 +199,9 @@ escribe("/terminos/", envoltura({
   <h2>3. Disponibilidad</h2>
   <p>Las existencias mostradas corresponden al inventario real. Si una prenda se agota entre que la agregas al carrito y pagas, te lo avisamos y no se realiza el cobro.</p>
   <h2>4. Pagos</h2>
-  <p>Los pagos con tarjeta se procesan a través de Mercado Pago. ROMA no almacena datos de tu tarjeta en ningún momento.</p>
+  <p>Los pagos con tarjeta se procesan a través de Mercado Pago. OMA no almacena datos de tu tarjeta en ningún momento.</p>
   <h2>5. Envíos, cambios y devoluciones</h2>
-  <p>Consulta <a href="${SITIO}/envios/">envíos</a> y <a href="${SITIO}/cambios/">cambios y devoluciones</a>.</p>
+  <p>Consulta <a href="/envios/">envíos</a> y <a href="/cambios/">cambios y devoluciones</a>.</p>
   <h2>6. Contacto</h2>
   <p>Para cualquier aclaración escríbenos por ${wa}.</p>`
 }));
@@ -209,15 +209,15 @@ escribe("/terminos/", envoltura({
 /* ---------------- PRIVACIDAD ---------------- */
 escribe("/privacidad/", envoltura({
   titulo: "Aviso de privacidad", ruta: "/privacidad/",
-  desc: "Aviso de privacidad de ROMA Sportwear: qué datos recabamos y para qué.",
+  desc: "Aviso de privacidad de OMA Sportwear: qué datos recabamos y para qué.",
   cuerpo: `
-  <div class="aviso">El responsable legal de los datos está pendiente de que ROMA lo proporcione; no se ha inventado.</div>
+  <div class="aviso">El responsable legal de los datos está pendiente de que OMA lo proporcione; no se ha inventado.</div>
   <h2>Responsable</h2>
   <p>${dato(neg.legal.responsableDatos, "nombre del responsable del tratamiento de datos")}, con domicilio en ${dato(neg.legal.domicilioFiscal, "domicilio")}.</p>
   <h2>Qué datos recabamos</h2>
   <p>Nombre completo, teléfono o WhatsApp, correo electrónico y dirección de entrega. Los usamos únicamente para procesar, enviar y dar seguimiento a tu pedido.</p>
   <h2>Datos de pago</h2>
-  <p>ROMA <b>no</b> recibe ni almacena los datos de tu tarjeta. El cobro lo procesa Mercado Pago en su propia plataforma.</p>
+  <p>OMA <b>no</b> recibe ni almacena los datos de tu tarjeta. El cobro lo procesa Mercado Pago en su propia plataforma.</p>
   <h2>Dónde se guardan</h2>
   <p>Los datos de tu pedido se guardan en tu propio dispositivo y, cuando aplica, en la base de datos de la tienda (Supabase) para dar seguimiento al pedido.</p>
   <h2>Con quién se comparten</h2>
@@ -229,18 +229,18 @@ escribe("/privacidad/", envoltura({
 /* ---------------- 404 ---------------- */
 fs.writeFileSync(path.join(raiz, "404.html"), envoltura({
   titulo: "Página no encontrada", ruta: "/404",
-  desc: "La página que buscas no existe en ROMA Sportwear.",
+  desc: "La página que buscas no existe en OMA Sportwear.",
   cuerpo: `
   <p>La dirección que abriste no existe o la prenda que buscabas ya no está publicada.</p>
-  <a class="cta" href="${SITIO}/">Ir a la tienda</a>
-  <a class="cta sec" href="${SITIO}/?vista=armador">Armar mi outfit</a>
+  <a class="cta" href="/">Ir a la tienda</a>
+  <a class="cta sec" href="/?vista=armador">Armar mi outfit</a>
   <h2 style="margin-top:30px">Quizá buscabas</h2>
   <ul>
-    <li><a href="${SITIO}/envios/">Envíos</a></li>
-    <li><a href="${SITIO}/cambios/">Cambios y devoluciones</a></li>
-    <li><a href="${SITIO}/guia-de-tallas/">Guía de tallas</a></li>
-    <li><a href="${SITIO}/preguntas-frecuentes/">Preguntas frecuentes</a></li>
-    <li><a href="${SITIO}/contacto/">Contacto</a></li>
+    <li><a href="/envios/">Envíos</a></li>
+    <li><a href="/cambios/">Cambios y devoluciones</a></li>
+    <li><a href="/guia-de-tallas/">Guía de tallas</a></li>
+    <li><a href="/preguntas-frecuentes/">Preguntas frecuentes</a></li>
+    <li><a href="/contacto/">Contacto</a></li>
   </ul>`
 }));
 

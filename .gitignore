@@ -1,6 +1,8 @@
 .DS_Store
-.netlify/
-.netlify/
 Thumbs.db
+.netlify/
 node_modules/
-node_modules/
+
+# Originales de las imágenes (35 MB) y capturas de revisión: se quedan en la computadora
+herramientas/fuentes/
+herramientas/capturas/

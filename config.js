@@ -1,10 +1,10 @@
 /* ============================================================
-   ROMA Sportwear — CONFIGURACIÓN CENTRAL
+   OMA Sportwear — CONFIGURACIÓN CENTRAL
    Edita aquí los datos del negocio. El administrador de la app
    puede sobreescribir estos valores (se guardan en Supabase).
    ============================================================ */
 const ROMA_CONFIG = {
-  storeName: "ROMA Sportwear",
+  storeName: "OMA Sportwear",
   whatsappNumber: "526633183894",     // pedidos y botón flotante
   currency: "MXN",
   pickupAddress: "Bazar Vintage Clothing de viernes a domingo 5:30pm a 11:00pm",
@@ -21,10 +21,16 @@ const ROMA_CONFIG = {
   mercadoPagoEnabled: true,           // ACTIVO — token en Netlify (MP_ACCESS_TOKEN)
   puntosEnabled: true,                // programa de puntos y niveles (Bronce/Oro/Élite)
   oroDiscountPct: 5,                  // % descuento automático nivel Oro (500+ pts)
-  eliteDiscountPct: 10                // % descuento automático nivel Élite (1500+ pts)
+  eliteDiscountPct: 10,               // % descuento automático nivel Élite (1500+ pts)
+
+  /* Inventario en vivo: con true, precio y existencias se leen de la base del
+     punto de venta en cada visita (requiere la migración 0005 aplicada; ver
+     CONEXION-INVENTARIO.md). Con false se usa catalogo.js, que sale del mismo
+     archivo de mercancía que carga el punto de venta. */
+  inventarioEnVivo: false
 };
 
-/* ---- Conexión a Supabase (administrador de productos) ----
+/* ---- Conexión a Supabase (configuración, códigos e inventario) ----
    1) Crea un proyecto gratis en https://supabase.com
    2) Ejecuta el archivo setup-supabase.sql en SQL Editor
    3) Pega aquí Project URL y anon public key (Settings → API)

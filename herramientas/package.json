@@ -1,0 +1,1 @@
+{"name":"oma-herramientas","private":true,"description":"Herramientas de imagen de la tienda. No se usan al publicar: sus resultados ya van en el repositorio.","dependencies":{"sharp":"^0.34.0"}}

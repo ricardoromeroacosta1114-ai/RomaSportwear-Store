@@ -1,0 +1,32 @@
+{
+  "_nota": "Rutas de producto de la tienda anterior (ROMA) y a qué prenda de hoy llevan. null = ya no se vende: va a la tienda.",
+  "productos": {
+    "chamarra-deportiva-negro": "jacket-negro",
+    "chamarra-deportiva-blanco": "jacket-blanco",
+    "chamarra-deportiva-azul-oscuro": "jacket-azul-ballena",
+    "chamarra-deportiva-cafe": "jacket-cafe",
+    "chamarra-deportiva-azul-lago": "jacket-azul-gris",
+    "chamarra-deportiva-rosa": "jacket-rosa",
+    "leggings-campana-negro": "legging-campana-negro",
+    "leggings-campana-cafe": "legging-campana-cafe",
+    "leggings-campana-azul-oscuro": "legging-campana-azul-oscuro",
+    "leggings-campana-cacao": "legging-campana-cacao",
+    "playera-dry-fit-negro": "playera-negro",
+    "playera-dry-fit-amarillo": "playera-amarillo",
+    "playera-dry-fit-azul-lago": "playera-azul-lago",
+    "playera-dry-fit-rosa": "playera-rosa",
+    "playera-dry-fit-morado": "playera-morado",
+    "playera-dry-fit-azul-oscuro": "playera-azul-ballena",
+    "playera-dry-fit-guinda": "playera-rojo",
+    "playera-dry-fit-beige": "playera-blanco-marfil",
+    "leggings-tubito-negro": null,
+    "leggings-tubito-azul-oscuro": null,
+    "leggings-tubito-cafe": null,
+    "leggings-tubito-morado": null,
+    "leggings-tubito-azul-lago": null,
+    "leggings-tubito-cacao": null,
+    "leggings-recto-negro": null,
+    "leggings-recto-beige": null,
+    "leggings-recto-cafe": null
+  }
+}

@@ -1,5 +1,5 @@
 /* ============================================================
-   ANALITICA — ROMA Sportwear
+   ANALITICA — OMA Sportwear
    Los identificadores NO viven aqui: se inyectan en la compilacion
    desde variables de entorno de Netlify (ver DEPLOY.md).
    Si no hay identificadores, esto no carga nada y no rastrea nada.
@@ -54,7 +54,7 @@
   function items(lista) {
     return (lista || []).map(function (i) {
       return {
-        item_id: i.sku, item_name: i.nombre, item_brand: "ROMA Sportwear",
+        item_id: i.sku, item_name: i.nombre, item_brand: "OMA Sportwear",
         item_category: i.categoria, item_variant: [i.color, i.talla].filter(Boolean).join(" / "),
         price: Number(i.precio) || 0, quantity: Number(i.cant) || 1
       };

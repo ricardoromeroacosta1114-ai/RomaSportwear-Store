@@ -1,105 +1,109 @@
 /* ============================================================
-   ROMA SPORTSWEAR — Tienda móvil
-   Catálogo tomado del inventario real del POS ROMA.
+   OMA SPORTWEAR — tienda en línea
    ------------------------------------------------------------
-   CONFIGURACIÓN EDITABLE (cámbiala aquí):                      */
-/* configuración: base en config.js + overrides guardados por el administrador */
+   El catálogo es el inventario del punto de venta (catalogo.js, generado
+   de data/catalogo.json). Precio y existencias se validan otra vez en el
+   servidor al pagar: lo que diga este archivo nunca decide cuánto se cobra.
+   ============================================================ */
+
+/* ---------- configuración: config.js + lo guardado desde el administrador ---------- */
 let CFG_OVR = (function(){ try{return JSON.parse(localStorage.getItem("romastore_cfg")||"{}");}catch(e){return {};} })();
 function CFG(){ return Object.assign({}, ROMA_CONFIG, CFG_OVR); }
 function setCfgOverrides(o){ CFG_OVR=o||{}; try{localStorage.setItem("romastore_cfg",JSON.stringify(CFG_OVR));}catch(e){} }
-/* Los códigos "generales" (ROMA10, BIENVENIDA, etc.) ya no viven aquí — se administran
-   desde el panel Admin y se cargan de la tabla `promos` en Supabase (apagados por defecto).
-   LOOK15 sigue especial: está ligado al armador de outfits y a outfitDiscountPct. */
-let CODIGOS = {
-  LOOK15: { tipo:"look", get valor(){return CFG().outfitDiscountPct;}, get desc(){return CFG().outfitDiscountPct+"% al llevar el look completo (arriba + abajo)";} }
+
+/* Códigos. OUTFIT es el descuento del armador (jacket o playera + legging);
+   los demás se administran en el panel y viven en la tabla `promos`. */
+const OUTFIT = { tipo:"look", get valor(){return CFG().outfitDiscountPct;},
+  get desc(){return CFG().outfitDiscountPct+" % al llevar el outfit completo (jacket o playera, más legging)";} };
+let CODIGOS = { OUTFIT };
+const codigoCanon = c => { c=(c||"").trim().toUpperCase(); return c==="LOOK15" ? "OUTFIT" : c; };
+
+/* ---------- catálogo ---------- */
+const ORDEN_TALLAS = ["XS","S","M","L","XL","XXL"];
+const ZONAS = ["capa","arriba","abajo"];
+const NOMBRE_ZONA = { capa:"Jacket", arriba:"Playera", abajo:"Legging" };
+/* Cómo llama la tienda a cada tipo del punto de venta (para el inventario en vivo). */
+const TIPOS_POS = {
+  chamarra:          { cat:"Jackets",  zona:"capa",   forma:"chamarra" },
+  "blusa deportiva": { cat:"Playeras", zona:"arriba", forma:"playera" },
+  legging:           { cat:"Leggings", zona:"abajo",  forma:"campana" }
 };
-/* ============================================================ */
 
-/* ---------- inventario (sincronizado del POS) ---------- */
-/* INV, NUEVO y OFERTA se cargan desde catalogo.js (generado de data/catalogo.json) */
+function slug(s){
+  return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+}
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 
-/* metadatos de escaparate (editable): novedades y ofertas */
-
-/* ---------- modelos agrupados (nombre+color) ---------- */
-function slug(s){return s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g,"-");}
-let MODELOS = (()=> {
+/* Agrupa las variantes (una por talla) en modelos (producto + color). */
+function construyeModelos(inv){
   const m = {};
-  INV.forEach(p=>{
-    const id = slug(p.nombre+"-"+p.color);
-    if(!m[id]) m[id] = { id, nombre:p.nombre, cat:p.cat, color:p.color, precio:p.precio,
-      antes:OFERTA[p.nombre]||null, nuevo:NUEVO.includes(p.nombre),
-      tipo: p.cat==="Playeras"?"arriba" : p.cat==="Chamarras"?"capa" : "abajo",
-      forma: p.nombre.includes("Tubito")?"tubito" : p.nombre.includes("Campana")?"campana"
-           : p.nombre.includes("Recto")?"recto" : p.cat==="Chamarras"?"chamarra":"playera",
-      tallas:{} };
+  (inv||[]).forEach(p=>{
+    const id = slug(p.nombre+" "+p.color);
+    if(!m[id]) m[id] = { id, nombre:p.nombre, cat:p.cat, color:p.color, hex:p.hex||"#8A8177", precio:p.precio,
+      antes:(typeof OFERTA!=="undefined"&&OFERTA[p.nombre])||null,
+      nuevo:(typeof NUEVO!=="undefined"&&NUEVO.includes(p.nombre)),
+      tipo:p.zona||"arriba", forma:p.forma||"playera", base:slug(p.nombre), tallas:{} };
     m[id].tallas[p.talla] = { sku:p.sku, stock:p.stock };
   });
-  return Object.values(m);
-})();
+  return Object.values(m).sort((a,b)=>ZONAS.indexOf(a.tipo)-ZONAS.indexOf(b.tipo)).map(x=>{
+    const orden={}; Object.keys(x.tallas).sort((a,b)=>ORDEN_TALLAS.indexOf(a)-ORDEN_TALLAS.indexOf(b)).forEach(t=>orden[t]=x.tallas[t]);
+    x.tallas=orden; return x;
+  });
+}
+let MODELOS = construyeModelos(typeof INV!=="undefined"?INV:[]);
 const modelo = id => MODELOS.find(x=>x.id===id);
 const variantes = nombre => MODELOS.filter(x=>x.nombre===nombre);
-
-/* ---------- colores ---------- */
-const COLORES = {
-  "Negro":["#211E1A","#0D0C0A"], "Blanco":["#F4F0E7","#D9D3C4"], "Azul Oscuro":["#26344B","#161F2E"],
-  "Cafe":["#6E5138","#4A3524"], "Azul Lago":["#3E7E8C","#2A5661"], "Rosa":["#D795A6","#B5717F"],
-  "Morado":["#6C5990","#4C3D68"], "Cacao":["#8A6A50","#5F4736"], "Beige":["#CBB989","#A89B77"], "Amarillo":["#D4AF3F","#A8862C"], "Guinda":["#7C3140","#57202B"]
-};
-
-/* ---------- siluetas SVG de prendas ---------- */
-function svgPrenda(forma, colorName, h=120){
-  const [c,s] = COLORES[colorName] || ["#999","#666"];
-  const oro="#C9A85C";
-  const cuerpos={
-    playera:`<path d="M50,14 C44,14 39,16.5 36,20 L15,29 L21,49 L30,45 L30,102 Q50,109 70,102 L70,45 L79,49 L85,29 L64,20 C61,16.5 56,14 50,14 Z" fill="${c}" stroke="${s}" stroke-width="1.6"/>
-      <path d="M41,15.5 Q50,24 59,15.5" fill="none" stroke="${s}" stroke-width="1.8"/>
-      <rect x="46.6" y="90" width="6.8" height="2.6" rx="1.3" fill="${oro}"/>`,
-    chamarra:`<path d="M50,10 C44,10 40,12.5 37,16 L15,25 L11,75 L23,77 L28,45 L28,106 Q50,113 72,106 L72,45 L77,77 L89,75 L85,25 L63,16 C60,12.5 56,10 50,10 Z" fill="${c}" stroke="${s}" stroke-width="1.6"/>
-      <path d="M50,20 L50,105" stroke="${s}" stroke-width="1.7"/>
-      <path d="M41,12 L50,22 L59,12" fill="none" stroke="${s}" stroke-width="1.8"/>
-      <path d="M34,88 L44,88 M56,88 L66,88" stroke="${s}" stroke-width="1.5"/>
-      <rect x="51.6" y="24" width="3.4" height="7" rx="1.4" fill="${oro}"/>`,
-    tubito:`<path d="M31,10 L69,10 L67,42 L63.5,122 L53.5,122 L50,58 L46.5,122 L36.5,122 L33,42 Z" fill="${c}" stroke="${s}" stroke-width="1.6"/>
-      <rect x="31" y="10" width="38" height="8" rx="3" fill="${s}"/>
-      <rect x="47" y="12.4" width="6" height="3.2" rx="1.4" fill="${oro}"/>`,
-    recto:`<path d="M31,10 L69,10 L67,44 L66,122 L52.5,122 L50,60 L47.5,122 L34,122 L33,44 Z" fill="${c}" stroke="${s}" stroke-width="1.6"/>
-      <rect x="31" y="10" width="38" height="8" rx="3" fill="${s}"/>
-      <rect x="47" y="12.4" width="6" height="3.2" rx="1.4" fill="${oro}"/>`,
-    campana:`<path d="M31,10 L69,10 L67,44 L76,122 L54,122 L50,62 L46,122 L24,122 L33,44 Z" fill="${c}" stroke="${s}" stroke-width="1.6"/>
-      <rect x="31" y="10" width="38" height="8" rx="3" fill="${s}"/>
-      <rect x="47" y="12.4" width="6" height="3.2" rx="1.4" fill="${oro}"/>`
-  };
-  return `<svg viewBox="0 0 100 130" height="${h}" role="img" aria-label="${forma} ${colorName}">${cuerpos[forma]||cuerpos.playera}</svg>`;
+const tallasDe = m => Object.keys(m.tallas);
+const hayStock = m => !m.agotado && Object.values(m.tallas).some(v=>v.stock>0);
+function tallasDisp(m){ return Object.entries(m.tallas).filter(([,v])=>v.stock>0).map(([t])=>t); }
+function piezasTotales(m){ return Object.values(m.tallas).reduce((n,v)=>n+(v.stock>0?v.stock:0),0); }
+/* Las familias de producto, en el orden en que se visten: jacket, playera, legging. */
+function familias(){
+  const f={};
+  MODELOS.forEach(m=>{ (f[m.nombre]=f[m.nombre]||{nombre:m.nombre,tipo:m.tipo,cat:m.cat,modelos:[]}).modelos.push(m); });
+  return Object.values(f).sort((a,b)=>ZONAS.indexOf(a.tipo)-ZONAS.indexOf(b.tipo));
 }
 
-/* ---------- catálogo remoto (Supabase, si está configurado) ---------- */
-function filaAModelo(r){
-  return { id:r.id, nombre:r.nombre, descripcion:r.descripcion||"", cat:r.cat, color:r.color,
-    precio:Number(r.precio), antes:r.antes?Number(r.antes):null, nuevo:!!r.nuevo, oferta:!!r.oferta,
-    agotado:!!r.agotado, tipo:r.tipo||"arriba", forma:r.forma||"playera",
-    tallas:r.tallas||{}, imagenes:r.imagenes||[], imgPrincipal:r.img_principal||0 };
-}
-function adoptaCatalogo(rows){
-  if(!rows||!rows.length) return;
-  MODELOS = rows.filter(r=>r.activo!==false).map(filaAModelo);
-  try{localStorage.setItem("romastore_catalogo",JSON.stringify(rows));}catch(e){}
+/* ---------- inventario en vivo (punto de venta) ----------
+   Con `inventarioEnVivo` encendido en config.js, precio y existencias se
+   leen de la base del punto de venta en cada visita. catalogo.js queda de
+   respaldo por si la base no responde. Ver CONEXION-INVENTARIO.md */
+function adoptaInventario(filas){
+  if(!Array.isArray(filas)||!filas.length) return false;
+  const inv=[];
+  filas.forEach(r=>{
+    const t=TIPOS_POS[String(r.tipo||"").toLowerCase()]; if(!t) return;
+    if(!(Number(r.precio)>0)) return;
+    inv.push({ sku:r.clave, nombre:r.producto, cat:t.cat, zona:t.zona, forma:t.forma, color:r.color,
+      hex:r.color_hex||(modelo(slug(r.producto+" "+r.color))||{}).hex||"#8A8177",
+      talla:String(r.talla||"").toUpperCase(), precio:Number(r.precio), stock:Math.max(0,Number(r.stock)||0) });
+  });
+  if(!inv.length) return false;
+  MODELOS=construyeModelos(inv); limpiaEstado();
+  return true;
 }
 async function cargarCatalogo(){
-  try{ const cache=JSON.parse(localStorage.getItem("romastore_catalogo")||"null"); if(cache) adoptaCatalogo(cache); }catch(e){}
+  try{ localStorage.removeItem("romastore_catalogo"); }catch(e){}     // catálogo viejo de ROMA
   if(!window.sb) return;
   try{
-    const {data,error}=await sb.from("productos").select("*").order("orden",{ascending:true});
-    if(!error&&data&&data.length){ adoptaCatalogo(data); render(); }
     const cfg=await sb.from("config").select("datos").eq("id",1).maybeSingle();
-    if(cfg.data&&cfg.data.datos){ setCfgOverrides(cfg.data.datos); render(); pintaWaFloat(); }
+    if(cfg.data&&cfg.data.datos&&JSON.stringify(cfg.data.datos)!==JSON.stringify(CFG_OVR)){ setCfgOverrides(cfg.data.datos); render(); pintaAviso(); pintaWaFloat(); }
   }catch(e){}
+  if(CFG().inventarioEnVivo===true){
+    try{
+      const r=await sb.rpc("roma_catalogo_web");
+      if(!r.error && adoptaInventario(r.data)) render();
+    }catch(e){}
+  }
 }
+function adoptaCatalogo(){ /* el catálogo ya no se edita aquí: viene del inventario */ }
 function adoptaPromos(rows){
   const activos={};
   (rows||[]).filter(r=>r.activo===true).forEach(r=>{
-    activos[r.codigo]={tipo:r.tipo, valor:r.valor, min:r.minimo, vence:r.vence, desc:r.descripcion};
+    activos[String(r.codigo).toUpperCase()]={tipo:r.tipo, valor:r.valor, min:r.minimo, vence:r.vence, desc:r.descripcion};
   });
-  CODIGOS={LOOK15:CODIGOS.LOOK15, ...activos};
+  CODIGOS=Object.assign({}, activos, {OUTFIT});
   try{localStorage.setItem("romastore_promos",JSON.stringify(rows));}catch(e){}
 }
 async function cargaPromos(){
@@ -107,7 +111,7 @@ async function cargaPromos(){
   if(!window.sb) return;
   try{
     const {data,error}=await sb.from("promos").select("*");
-    if(!error&&data){ adoptaPromos(data); render(); }
+    if(!error&&data){ const antes=JSON.stringify(Object.keys(CODIGOS).sort()); adoptaPromos(data); if(JSON.stringify(Object.keys(CODIGOS).sort())!==antes) render(); }
   }catch(e){}
 }
 function pintaWaFloat(){ const a=document.getElementById("waFloat"); if(a) a.href="https://wa.me/"+CFG().whatsappNumber; }
@@ -122,24 +126,33 @@ let looks   = DB.load("looks",[]);            // [{id,nombre,slots:{arriba,abajo
 let ordenes = DB.load("ordenes",[]);
 let perfil  = DB.load("perfil",{nombre:"",whats:"",dir:""});
 let puntos  = DB.load("puntos",0);
-let codigoAplicado = DB.load("codigo",null);
-let entrega = DB.load("entrega","pickup"); if(entrega==="envio"){entrega="local";DB.save("entrega","local");}
+let codigoAplicado = codigoCanon(DB.load("codigo",null))||null;
+let entrega = DB.load("entrega","local"); if(entrega==="envio") entrega="local";
 let tema    = DB.load("tema","claro");
 
 let vista="home", vistaParam=null, catFiltro="Todo";
 let filtroTalla="", filtroColor="", filtroPrecio="", filtroDisp="";
-let fichaColorSel={}, fichaTallaSel={};
-let outfit = DB.load("outfit",{arriba:null,abajo:null,capa:null}); // ids de modelo
-let slotActivo="arriba";
+let fichaTallaSel={}, fichaVista="prenda", famColor={};
+let outfit = DB.load("outfit",{arriba:null,abajo:null,capa:null});   // ids de modelo
+let outfitTallas = DB.load("outfitTallas",{});                        // { zona: talla }
+let lookPortada = 0;
 
 const $ = id=>document.getElementById(id);
 const peso = n=>"$"+(Math.round(n*100)/100).toLocaleString("es-MX",{minimumFractionDigits:2});
-function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove("on"),2200); }
+function toast(m){ const t=$("toast"); if(!t) return; t.textContent=m; t.classList.add("on"); clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove("on"),2400); }
 
-/* ---------- reseñas ----------
-   Solo se muestran reseñas verificadas de clientas reales.
-   Cuando exista la tabla 'resenas' en Supabase se leerán de ahí;
-   mientras tanto no se inventa ninguna ni se muestra calificación. */
+/* Lo guardado en el teléfono puede hablar de prendas que ya no existen
+   (el catálogo cambió): se retira sin romper nada. */
+function limpiaEstado(){
+  const antes=carrito.length;
+  carrito=carrito.filter(i=>i&&skuInfo(i.sku));
+  if(carrito.length!==antes) DB.save("carrito",carrito);
+  ZONAS.forEach(z=>{ if(outfit[z]&&!modelo(outfit[z])){ outfit[z]=null; delete outfitTallas[z]; } });
+  looks=looks.filter(L=>L&&L.slots&&ZONAS.some(z=>L.slots[z]&&modelo(L.slots[z])));
+  looks.forEach(L=>ZONAS.forEach(z=>{ if(L.slots[z]&&!modelo(L.slots[z])) L.slots[z]=null; }));
+}
+
+/* ---------- reseñas: solo verificadas, nunca inventadas ---------- */
 function resenasDe(id){
   const todas = (window.RESENAS_VERIFICADAS||[]).filter(r=>r.producto===id);
   return { items: todas, rating: null, total: todas.length };
@@ -155,78 +168,137 @@ const ADMIN_VISIBLE=(function(){
   }catch(e){ return false; }
 })();
 
-/* ---------- renders 3D de prendas ----------
-   Ilustraciones 3D generadas para el catalogo (fondo recortado).
-   NO son fotografias del producto: se etiquetan como ilustracion.
-   Cuando existan fotos reales, imagenes[] del modelo tiene prioridad. */
-function render3D(m){
-  return (window.RENDERS_3D && window.RENDERS_3D[m.id]) || null;
-}
-function altPrenda(m){
-  return m.nombre + " " + m.color + " — ilustración 3D referencial de ROMA Sportwear";
-}
-/* Figura de la prenda: foto real > render 3D > dibujo vectorial. */
-function figura3D(m, alto){
-  const url = render3D(m);
-  if(!url) return null;
-  /* Sin alto explicito manda el CSS del contenedor. */
+/* ---------- imágenes de prenda ----------
+   Son ilustraciones 3D con el tono medido de la tela, no fotografías, y así
+   se describen. Si el inventario trae un color sin imagen, se tiñe al vuelo
+   sobre la prenda base; el dibujo de línea es el último respaldo. */
+function render3D(m){ return (window.RENDERS_3D && window.RENDERS_3D[m.id]) || null; }
+function altPrenda(m){ return m.nombre+" color "+m.color+". Ilustración 3D de referencia de OMA Sportwear."; }
+function figura3D(m, alto, opciones){
+  const url=render3D(m), o=opciones||{};
   const est = alto ? ` style="height:${alto}px;width:auto"` : "";
-  return `<img class="fig3d" src="${url}" alt="${altPrenda(m)}"${est} width="700" height="700" loading="lazy" decoding="async">`;
+  const idAttr = o.id ? ` id="${o.id}"` : "";
+  if(url) return `<img class="fig3d"${idAttr} src="${url}" alt="${esc(altPrenda(m))}"${est} width="1000" height="1000" ${o.prioridad?'fetchpriority="high"':'loading="lazy"'} decoding="async">`;
+  if(window.RENDER_BASES && window.RENDER_BASES.indexOf(m.base)>=0)
+    return `<canvas class="fig3d"${idAttr} width="700" height="700" data-plana="${m.base}" data-hex="${m.hex}" role="img" aria-label="${esc(altPrenda(m))}"${est}></canvas>`;
+  return null;
+}
+function prendaImg(m,h,o){ return figura3D(m,h,o) || svgPrenda(m.forma,m.hex,h); }
+function figuraDe(m,h,o){
+  const imgs=m.imagenes||[], principal=imgs[m.imgPrincipal||0]||imgs[0];
+  if(principal) return `<img src="${principal}" alt="${esc(m.nombre+" "+m.color)}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`;
+  return prendaImg(m,h,o);
+}
+/* Dibujo de línea de respaldo. */
+function svgPrenda(forma, hex, h=120){
+  const c=hex||"#8A8177", s="rgba(25,25,25,.35)";
+  const cuerpos={
+    playera:`<path d="M50,14 C44,14 39,16.5 36,20 L15,29 L21,49 L30,45 L30,102 Q50,109 70,102 L70,45 L79,49 L85,29 L64,20 C61,16.5 56,14 50,14 Z" fill="${c}" stroke="${s}" stroke-width="1.2"/>`,
+    chamarra:`<path d="M50,10 C44,10 40,12.5 37,16 L15,25 L11,75 L23,77 L28,45 L28,96 Q50,103 72,96 L72,45 L77,77 L89,75 L85,25 L63,16 C60,12.5 56,10 50,10 Z" fill="${c}" stroke="${s}" stroke-width="1.2"/><path d="M50,18 L50,98" stroke="${s}" stroke-width="1.2"/>`,
+    campana:`<path d="M31,10 L69,10 L67,44 L76,122 L54,122 L50,62 L46,122 L24,122 L33,44 Z" fill="${c}" stroke="${s}" stroke-width="1.2"/>`
+  };
+  return `<svg viewBox="0 0 100 130" ${h?`height="${h}"`:""} role="img" aria-label="${esc(forma)}">${cuerpos[forma]||cuerpos.playera}</svg>`;
 }
 
-/* ---------- eventos de conversion ---------- */
-/* Convierte SKUs del carrito al formato que espera analitica.js. */
+/* ---------- maniquí ---------- */
+function prendasDe(slots){
+  const o={};
+  ["abajo","arriba","capa"].forEach(z=>{ const m=slots&&slots[z]&&modelo(slots[z]); if(m) o[z]={base:m.base,hex:m.hex}; });
+  return o;
+}
+function altOutfit(slots){
+  const p=ZONAS.map(z=>slots&&slots[z]&&modelo(slots[z])).filter(Boolean).map(m=>m.nombre.toLowerCase()+" "+m.color.toLowerCase());
+  return p.length ? "Maniquí blanco con "+p.join(", ")+"." : "Maniquí blanco sin prendas.";
+}
+let maniquiVisto=false, secuenciaHecha=false;
+function maniquiHtml(slots,o){
+  o=o||{};
+  const sec=o.secuencia&&!secuenciaHecha;
+  return `<div class="escena${maniquiVisto?"":" cargando"}"><canvas class="maniqui"${o.id?` id="${o.id}"`:""} width="644" height="1920"
+    data-maniqui='${JSON.stringify(prendasDe(slots))}'${o.escala?` data-escala="${o.escala}"`:""}${sec?' data-secuencia="1"':""}
+    role="img" aria-label="${esc(altOutfit(slots))}"></canvas></div>`;
+}
+function pintaManiqui(cv,prendas,o){
+  if(!cv||!window.OMA_MANIQUI) return;
+  o=o||{};
+  const marco=cv.parentElement;
+  const listo=()=>{ maniquiVisto=true; if(marco&&marco.classList) marco.classList.remove("cargando"); };
+  if(o.secuencia) secuenciaHecha=true;
+  const p = o.secuencia ? OMA_MANIQUI.visteEnSecuencia(cv,prendas,{alEmpezar:listo}) : OMA_MANIQUI.viste(cv,prendas,{escala:o.escala});
+  p.then(listo).catch(()=>{ if(marco&&marco.classList){ marco.classList.remove("cargando"); marco.classList.add("fallo"); } });
+}
+/* Enciende los lienzos que la vista recién pintada trae declarados. */
+function montaLienzos(){
+  const v=$("views"); if(!v||!v.querySelectorAll) return;
+  v.querySelectorAll("canvas[data-maniqui]").forEach(cv=>{
+    let prendas={}; try{ prendas=JSON.parse(cv.dataset.maniqui||"{}"); }catch(e){}
+    pintaManiqui(cv,prendas,{escala:Number(cv.dataset.escala)||0,secuencia:!!cv.dataset.secuencia});
+  });
+  v.querySelectorAll("canvas[data-plana]").forEach(cv=>{
+    if(window.OMA_MANIQUI) OMA_MANIQUI.pintaPlana(cv,cv.dataset.plana,cv.dataset.hex).catch(()=>{});
+  });
+}
+
+/* ---------- eventos de conversión ---------- */
 function evItems(lista){
   return (lista||[]).map(function(i){
     const inf=skuInfo(i.sku); if(!inf) return null;
-    return {sku:i.sku,nombre:inf.m.nombre,categoria:inf.m.cat,color:inf.m.color,
-            talla:inf.talla,precio:inf.m.precio,cant:i.cant};
+    return {sku:i.sku,nombre:inf.m.nombre,categoria:inf.m.cat,color:inf.m.color,talla:inf.talla,precio:inf.m.precio,cant:i.cant};
   }).filter(Boolean);
 }
 function evModelo(m,talla,cant){
-  return [{sku:(talla&&m.tallas[talla]&&m.tallas[talla].sku)||m.id,nombre:m.nombre,
-           categoria:m.cat,color:m.color,talla:talla||"",precio:m.precio,cant:cant||1}];
+  return [{sku:(talla&&m.tallas[talla]&&m.tallas[talla].sku)||m.id,nombre:m.nombre,categoria:m.cat,color:m.color,talla:talla||"",precio:m.precio,cant:cant||1}];
 }
 function ev(nombre,datos){ if(window.ROMA_EVENTO) window.ROMA_EVENTO(nombre,datos||{}); }
 
-/* ---------- carrito helpers ---------- */
+/* ---------- bolsa ---------- */
 const skuInfo = sku => { for(const m of MODELOS) for(const [t,v] of Object.entries(m.tallas)) if(v.sku===sku) return {m,talla:t,stock:v.stock}; return null; };
 const cartCount = ()=>carrito.reduce((s,i)=>s+i.cant,0);
+const subtotal = ()=>carrito.reduce((s,i)=>{const inf=skuInfo(i.sku);return s+(inf?inf.m.precio*i.cant:0);},0);
 function addSku(sku,cant=1,silencio=false){
-  ev("add_to_cart",{items:evItems([{sku,cant}]),valor:(skuInfo(sku)?skuInfo(sku).m.precio*cant:0)});
   const info=skuInfo(sku); if(!info) return false;
   const ya=carrito.find(i=>i.sku===sku);
   const actual=ya?ya.cant:0;
-  if(actual+cant>info.stock){ toast("Solo quedan "+info.stock+" en talla "+info.talla); cant=info.stock-actual; if(cant<=0) return false; }
+  if(actual+cant>info.stock){
+    toast(info.stock===1?"Solo queda 1 pieza en talla "+info.talla:"Solo quedan "+info.stock+" piezas en talla "+info.talla);
+    cant=info.stock-actual; if(cant<=0) return false;
+  }
+  ev("add_to_cart",{items:evItems([{sku,cant}]),valor:info.m.precio*cant});
   if(ya) ya.cant+=cant; else carrito.push({sku,cant});
   DB.save("carrito",carrito); pintaBadge(true);
-  if(!silencio) toast("Agregado al carrito");
+  if(!silencio) toast("Agregado a tu bolsa");
   return true;
 }
 function pintaBadge(pop){
-  const b=$("cartBadge"), n=cartCount();
+  const b=$("cartBadge"); if(!b) return;
+  const n=cartCount();
   b.textContent=n; b.classList.toggle("on",n>0);
   if(pop&&n>0){ b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); }
 }
 
-/* ---------- totales + códigos ---------- */
+/* ---------- totales y códigos ---------- */
 function lookCompletoEnCarrito(){
-  const tipos=new Set(carrito.map(i=>skuInfo(i.sku)?.m.tipo));
+  const tipos=new Set(carrito.map(i=>{const inf=skuInfo(i.sku);return inf&&inf.m.tipo;}));
   return (tipos.has("arriba")||tipos.has("capa")) && tipos.has("abajo");
 }
 function validaCodigo(cod){
-  cod=(cod||"").trim().toUpperCase();
+  cod=codigoCanon(cod);
   if(!cod) return {ok:false,msg:"Escribe un código"};
   const c=CODIGOS[cod];
-  if(!c) return {ok:false,msg:"Código no válido"};
-  if(c.vence && c.vence < new Date().toISOString().slice(0,10)) return {ok:false,msg:"Este código ya expiró"};
-  const sub=carrito.reduce((s,i)=>{const inf=skuInfo(i.sku);return s+inf.m.precio*i.cant;},0);
-  if(c.min && sub<c.min) return {ok:false,msg:"Válido en compras desde "+peso(c.min)};
-  if(c.tipo==="look" && !lookCompletoEnCarrito()) return {ok:false,msg:"Necesitas una prenda de arriba y una de abajo"};
-  return {ok:true,cod,c,msg:"✓ "+c.desc};
+  if(!c) return {ok:false,msg:"Ese código no existe"};
+  if(c.vence && c.vence < new Date().toISOString().slice(0,10)) return {ok:false,msg:"Ese código ya venció"};
+  const sub=subtotal();
+  if(c.min && sub<c.min) return {ok:false,msg:"Vale en compras desde "+peso(c.min)};
+  if(c.tipo==="look" && !lookCompletoEnCarrito()) return {ok:false,msg:"Necesitas una jacket o playera y un legging"};
+  return {ok:true,cod,c,msg:c.desc};
+}
+function nivelPctActual(){
+  const C=CFG(); if(C.puntosEnabled===false) return 0;
+  const niv=nivelDe(puntos)[0];
+  return niv==="Élite"?(C.eliteDiscountPct||0) : niv==="Oro"?(C.oroDiscountPct||0) : 0;
 }
 function totales(){
-  const sub=carrito.reduce((s,i)=>{const inf=skuInfo(i.sku);return s+inf.m.precio*i.cant;},0);
+  const sub=subtotal();
   let desc=0, envioGratisCod=false, etiqueta="";
   if(codigoAplicado){
     const v=validaCodigo(codigoAplicado);
@@ -236,679 +308,739 @@ function totales(){
       if(c.tipo==="pct"||c.tipo==="look") desc=sub*c.valor/100;
       else if(c.tipo==="fijo") desc=Math.min(c.valor,sub);
       else if(c.tipo==="envio") envioGratisCod=true;
-      etiqueta=codigoAplicado;
+      etiqueta=codigoAplicado==="OUTFIT"?"outfit completo":codigoAplicado;
     }
   }
-  const C=CFG();
-  if(C.puntosEnabled!==false){
-    const nivel=nivelDe(puntos)[0];
-    const nivelPct = nivel==="Élite"?(C.eliteDiscountPct||0) : nivel==="Oro"?(C.oroDiscountPct||0) : 0;
-    if(nivelPct>0){
-      const descNivel=sub*nivelPct/100;
-      if(descNivel>desc){ desc=descNivel; etiqueta="Nivel "+nivel; }
-    }
+  const C=CFG(), nivelPct=nivelPctActual();
+  if(nivelPct>0){
+    const descNivel=sub*nivelPct/100;
+    if(descNivel>desc){ desc=descNivel; etiqueta="nivel "+nivelDe(puntos)[0]; }
   }
   const costoBase = entrega==="pickup" ? 0 : entrega==="nacional" ? C.nationalShippingCost : C.localDeliveryCost;
   const gratis = envioGratisCod || (C.freeShippingFrom>0 && (sub-desc)>=C.freeShippingFrom);
-  let envio = (sub>0 && !gratis) ? costoBase : 0;
+  const envio = (sub>0 && !gratis) ? costoBase : 0;
   return {sub,desc,envio,total:Math.max(sub-desc,0)+envio,etiqueta,envioGratisCod};
 }
 
-/* ---------- router ---------- */
-const NAV=[["home","⌂","Inicio"],["tienda","▤","Tienda"],["armador","✦","Armar"],["looks","♡","Looks"],["perfil","◉","Perfil"]];
+/* ---------- navegación ---------- */
+const ICONOS = {
+  inicio:'<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>',
+  tienda:'<svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5"/><rect x="13.5" y="4" width="6.5" height="6.5"/><rect x="4" y="13.5" width="6.5" height="6.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5"/></svg>',
+  outfit:'<svg viewBox="0 0 24 24"><circle cx="12" cy="4.6" r="2"/><path d="M12 6.6v2.2M8.2 9.4h7.6l1.4 5.4-2 .6-.7-2.6V21h-5v-8.2l-.7 2.6-2-.6z"/></svg>',
+  cuenta:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c.9-3.7 3.9-5.6 7.5-5.6s6.6 1.9 7.5 5.6"/></svg>'
+};
+const NAV=[["home","inicio","Inicio"],["tienda","tienda","Tienda"],["armador","outfit","Outfit"],["perfil","cuenta","Cuenta"]];
+const quieto = ()=>!!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+function enfocaVista(){
+  const h=document.querySelector("#views h1");
+  if(h&&h.focus){ h.setAttribute&&h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); }
+}
+/* Cambia la pantalla con una transición si el navegador la tiene. Si la
+   aborta (por ejemplo, al girar el teléfono) el cambio ya quedó hecho. */
+function transita(cambia,despues){
+  const fin=despues||(()=>{});
+  if(document.startViewTransition && !quieto()){
+    const t=document.startViewTransition(cambia);
+    if(t&&t.ready&&t.ready.catch) t.ready.catch(()=>{});
+    if(t&&t.finished&&t.finished.then) t.finished.then(fin,fin); else fin();
+  }else{ cambia(); fin(); }
+}
 function go(v,param=null){
   if(v==="producto"&&param&&modelo(param)) ev("select_item",{items:evModelo(modelo(param)),valor:modelo(param).precio});
-  vista=v; vistaParam=param; render(); window.scrollTo({top:0});
+  if(v==="producto") fichaVista="prenda";
+  const cambia=()=>{ vista=v; vistaParam=param; render(); window.scrollTo({top:0}); };
+  transita(cambia,enfocaVista);
+  cierraMenu();
+}
+/* Abrir una prenda desde su tarjeta: la imagen viaja de la tarjeta a la ficha. */
+function abre(el,id){
+  try{ const img=el&&el.querySelector&&el.querySelector(".fig3d"); if(img) img.style.viewTransitionName="prenda"; }catch(e){}
+  go("producto",id);
 }
 function render(){
-  $("nav").innerHTML=NAV.map(([k,ic,l])=>`<button class="${vista===k?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join("");
+  const nav=$("nav");
+  if(nav) nav.innerHTML=NAV.map(([k,ic,l])=>`<button class="${vista===k?'on':''}" onclick="go('${k}')"${vista===k?' aria-current="page"':''}>${ICONOS[ic]}${l}</button>`).join("");
   const V=Object.assign({home:viewHome,tienda:viewTienda,producto:viewProducto,armador:viewArmador,looks:viewLooks,
     carrito:viewCarrito,checkout:viewCheckout,confirmacion:viewConfirmacion,pagoMP:viewPagoMP,perfil:viewPerfil,pedidos:viewPedidos}, window.EXTRA_VIEWS||{});
-  $("views").innerHTML=`<div class="view">${(V[vista]||viewHome)()}</div>`;
+  const vistas=$("views");
+  if(vistas) vistas.innerHTML=`<div class="view">${(V[vista]||viewHome)()}</div>`;
+  if(document.body&&document.body.classList) document.body.classList.toggle("con-total",vista==="armador");
+  if(document.querySelectorAll) document.querySelectorAll(".cab-nav [data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===vista));
   pintaBadge(false);
+  montaLienzos();
+}
+function abreMenu(){ const m=$("menu"); if(m&&m.showModal&&!m.open) m.showModal(); }
+function cierraMenu(){ const m=$("menu"); if(m&&m.open&&m.close) m.close(); }
+function pintaAviso(){
+  const a=$("aviso"); if(!a) return;
+  const C=CFG(), p=["Entrega local en Mexicali","Envíos a todo México"];
+  if(C.freeShippingFrom>0) p.push("Envío gratis desde "+peso(C.freeShippingFrom).replace(".00",""));
+  a.innerHTML=p.map(t=>`<span>${t}</span>`).join("");
 }
 
 /* ============================================================
    VISTAS
-============================================================ */
-/* Imagen de una prenda en cualquier tamaño: render 3D si existe,
-   dibujo vectorial como respaldo. */
-function prendaImg(m,h){ return figura3D(m,h) || svgPrenda(m.forma,m.color,h); }
-
-function figuraDe(m,h){
-  const imgs=m.imagenes||[];
-  const principal=imgs[m.imgPrincipal||0]||imgs[0];
-  if(!principal){ const r=figura3D(m,h); if(r) return r; }
-  return principal?`<img src="${principal}" alt="${m.nombre} ${m.color}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`:svgPrenda(m.forma,m.color,h);
-}
-/* Solo las tallas que de verdad tienen existencia. */
-function tallasDisp(m){
-  return Object.entries(m.tallas).filter(([,v])=>v.stock>0).map(([t])=>t);
-}
-function piezasTotales(m){
-  return Object.values(m.tallas).reduce((n,v)=>n+(v.stock>0?v.stock:0),0);
-}
-
+   ============================================================ */
 function cardProducto(m){
-  const ago = m.agotado || !Object.values(m.tallas).some(v=>v.stock>0);
-  const tag = ago?`<span class="tag" style="background:var(--gris)">AGOTADO</span>` : m.antes?`<span class="tag oferta">OFERTA</span>` : m.nuevo?`<span class="tag">NUEVO</span>`:"";
-  return `<button class="p-card" style="${ago?'opacity:.55':''}" onclick="go('producto','${m.id}')">
-    <div class="p-fig">${tag}${figuraDe(m,150)}</div>
-    <div class="p-nombre">${m.nombre}</div>
-    <div class="p-meta">${m.color}${ago?"":" · Tallas "+tallasDisp(m).join(" / ")}</div>
-    <div class="p-precio">${peso(m.precio)}${m.antes?`<s>${peso(m.antes)}</s>`:""}</div>
-    ${!ago&&piezasTotales(m)<=2?`<div class="p-ultimas">Últimas ${piezasTotales(m)} piezas</div>`:""}
+  const ago=!hayStock(m), pz=piezasTotales(m);
+  return `<button class="tarjeta${ago?" agotada":""}" onclick="abre(this,'${m.id}')">
+    <span class="tarjeta-fig">${ago?'<span class="etq">Agotado</span>':""}${figuraDe(m,0)}</span>
+    <span class="tarjeta-nom">${esc(m.nombre)}</span>
+    <span class="tarjeta-col"><i class="punto" style="background:${m.hex}"></i>${esc(m.color)}</span>
+    <span class="tarjeta-pre">${peso(m.precio)}${m.antes?`<s>${peso(m.antes)}</s>`:""}</span>
+    ${!ago&&pz<=2?`<span class="tarjeta-nota">${pz===1?"Última pieza":"Últimas "+pz+" piezas"}</span>`:""}
   </button>`;
 }
 
-/* looks curados */
-const LOOKS_ROMA=[
- {nombre:"Total Black", desc:"El clásico que no falla",  slots:{arriba:"playera-dry-fit-negro",abajo:"leggings-recto-negro",capa:"chamarra-deportiva-negro"}},
- {nombre:"Tierra",      desc:"Tonos cálidos, energía suave", slots:{arriba:"playera-dry-fit-beige",abajo:"leggings-recto-cafe",capa:"chamarra-deportiva-cafe"}},
- {nombre:"Lago",        desc:"Azules profundos para entrenar", slots:{arriba:"playera-dry-fit-azul-lago",abajo:"leggings-campana-azul-oscuro",capa:"chamarra-deportiva-azul-lago"}}
+/* Combinaciones armadas con colores que sí hay en el inventario. */
+const LOOKS_OMA=[
+ {nombre:"Negro completo",  slots:{capa:"jacket-negro",        arriba:"playera-negro",         abajo:"legging-campana-negro"}},
+ {nombre:"Cacao y marfil",  slots:{capa:"jacket-cacao",        arriba:"playera-blanco-marfil", abajo:"legging-campana-cacao"}},
+ {nombre:"Azules",          slots:{capa:"jacket-azul-ballena", arriba:"playera-azul-lago",     abajo:"legging-campana-azul-oscuro"}},
+ {nombre:"Morado y lila",   slots:{capa:"jacket-morado",       arriba:"playera-lila",          abajo:"legging-campana-morado"}},
+ {nombre:"Marfil y café",   slots:{capa:"jacket-marfil",       arriba:"playera-negro",         abajo:"legging-campana-cafe"}}
 ];
-function lookPrecio(sl){ return ["arriba","abajo","capa"].reduce((s,k)=>{const m=sl[k]&&modelo(sl[k]);return s+(m?m.precio:0);},0); }
-function lookFlat(sl,esc=1){
-  const a=sl.arriba&&modelo(sl.arriba), b=sl.abajo&&modelo(sl.abajo), c=sl.capa&&modelo(sl.capa);
-  const piezas=[c,a,b].filter(Boolean);
-  if(!piezas.length) return "";
-  /* Fila limpia: cada prenda en su celda, sin superponerse. */
-  return `<div class="look-fila">${piezas.map(m=>
-    `<span class="look-celda">${prendaImg(m,0)}</span>`).join("")}</div>`;
+/* Solo las combinaciones cuyas prendas existen hoy. */
+function looksVivos(){ return LOOKS_OMA.filter(L=>ZONAS.every(z=>!L.slots[z]||modelo(L.slots[z]))); }
+function lookPrecio(sl){ return ZONAS.reduce((s,k)=>{const m=sl[k]&&modelo(sl[k]);return s+(m?m.precio:0);},0); }
+function trioHtml(sl){ return ZONAS.map(z=>{const m=sl[z]&&modelo(sl[z]);return m?`<i style="background:${m.hex}"></i>`:"";}).join(""); }
+function verLookPortada(i){
+  const L=looksVivos()[i]; if(!L) return;
+  lookPortada=i;
+  pintaManiqui($("mqPortada"),prendasDe(L.slots));
+  if(document.querySelectorAll) document.querySelectorAll(".portada-looks .trio").forEach((b,k)=>b.setAttribute("aria-pressed",k===i?"true":"false"));
+  const cv=$("mqPortada"); if(cv&&cv.setAttribute) cv.setAttribute("aria-label",altOutfit(L.slots));
+}
+function abrirLookEnArmador(i){
+  const L=looksVivos()[i]; if(!L) return;
+  outfit=Object.assign({arriba:null,abajo:null,capa:null},L.slots); outfitTallas={};
+  DB.save("outfit",outfit); DB.save("outfitTallas",outfitTallas); go("armador");
 }
 
-/* Indicador de progreso hacia el envio gratis. Solo aparece si la
-   condicion existe de verdad en la configuracion de la tienda. */
 function barraEnvioGratis(){
   const C=CFG(), meta=Number(C.freeShippingFrom)||0;
-  if(meta<=0) return "";
-  const sub=carrito.reduce((t,i)=>{const inf=skuInfo(i.sku);return t+(inf?inf.m.precio*i.cant:0);},0);
-  if(sub<=0) return `<div class="envio-barra"><span>Envío gratis en compras desde ${peso(meta)}</span></div>`;
-  if(sub>=meta) return `<div class="envio-barra listo"><span>✓ ¡Tu envío es gratis!</span></div>`;
-  const falta=meta-sub, pct=Math.min(100,Math.round(sub/meta*100));
-  return `<div class="envio-barra">
-    <span>Te faltan <b>${peso(falta)}</b> para envío gratis</span>
+  if(meta<=0||entrega==="pickup") return "";
+  const sub=subtotal();
+  if(sub<=0) return "";
+  if(sub>=meta) return `<div class="envio-barra listo"><span>Tu envío va por nuestra cuenta.</span></div>`;
+  const pct=Math.min(100,Math.round(sub/meta*100));
+  return `<div class="envio-barra"><span>Te faltan <b>${peso(meta-sub)}</b> para el envío gratis.</span>
     <div class="envio-pista"><i style="width:${pct}%"></i></div></div>`;
 }
 
-/* Pie con enlaces a las paginas de confianza (tambien ayuda al SEO interno). */
 function pieTienda(){
   return `<footer class="pie">
-    <div class="pie-links">
+    <div><img class="logo-claro" src="/marca/oma-logo-claro.webp" width="1100" height="491" alt="OMA Sportwear" loading="lazy">
+      <img class="logo-oscuro" src="/marca/oma-logo-oscuro.webp" width="1100" height="535" alt="OMA Sportwear" loading="lazy"></div>
+    <nav class="pie-links" aria-label="Información">
       <a href="/envios/">Envíos</a><a href="/cambios/">Cambios y devoluciones</a>
       <a href="/guia-de-tallas/">Guía de tallas</a><a href="/preguntas-frecuentes/">Preguntas frecuentes</a>
-      <a href="/sobre-roma/">Sobre ROMA</a><a href="/contacto/">Contacto</a>
+      <a href="/sobre-oma/">Sobre OMA</a><a href="/contacto/">Contacto</a>
       <a href="/terminos/">Términos</a><a href="/privacidad/">Aviso de privacidad</a>
-    </div>
-    <p class="pie-nota">ROMA Sportwear · Mexicali, B.C. · Precios en pesos mexicanos (MXN)</p>
+    </nav>
+    <p class="pie-nota">OMA Sportwear, Mexicali, Baja California. Precios en pesos mexicanos. Las imágenes de prenda son ilustraciones 3D de referencia.</p>
   </footer>`;
 }
 
+function fraseColores(fs){
+  const p=fs.map((f,i)=>`${f.modelos.length} ${i===0?"colores de ":"de "}${f.nombre.toLowerCase()}`);
+  return p.length>1 ? p.slice(0,-1).join(", ")+" y "+p[p.length-1] : (p[0]||"");
+}
 function viewHome(){
-  const nuevos=MODELOS.filter(m=>m.nuevo);
-  const ofertas=MODELOS.filter(m=>m.antes);
-  const cats=["Todo","Leggings","Playeras","Chamarras","Nuevo","Ofertas"];
+  const C=CFG(), fs=familias(), lv=looksVivos();
+  if(lookPortada>=lv.length) lookPortada=0;
+  const inicial=lv[lookPortada] ? lv[lookPortada].slots : {};
+  const otro=lv[1]||lv[0];
   return `
-  <section class="hero">
-    <div class="marca3d"><img class="logo-light" src="/icons/logo.png" width="391" height="280" alt="ROMA Sportwear"><img class="logo-dark" src="/icons/logo-dark.png" width="391" height="280" alt=""></div>
-    <div class="eyebrow">Mexicali · Envíos a todo México</div>
-    <h1 class="serif">Ropa deportiva<br>para moverte<br>a tu manera.</h1>
-    <p>Compra por prenda o arma tu outfit completo.</p>
-    <div class="hero-cta">
-      <button class="btn-oro" onclick="go('tienda')">Comprar colección</button>
-      <button class="btn-linea" onclick="go('armador')"><span class="fl">✦</span> Armar mi outfit</button>
+  <section class="portada">
+    <div class="portada-txt">
+      <h1 class="display" tabindex="-1">Ropa deportiva para moverte a tu manera.</h1>
+      <p class="entrada">${fs.length?fraseColores(fs).replace(/^./,c=>c.toUpperCase())+". Llévalos por prenda o arma tu outfit completo.":"Llévala por prenda o arma tu outfit completo."}</p>
+      <div class="acciones">
+        <button class="btn" onclick="go('tienda')">Ver la colección</button>
+        <button class="btn btn-claro" onclick="go('armador')">Armar mi outfit</button>
+      </div>
+    </div>
+    <div class="portada-escena">
+      ${maniquiHtml(inicial,{id:"mqPortada",secuencia:true})}
+    </div>
+    ${lv.length>1?`<div class="portada-looks" role="group" aria-label="Probar otra combinación">
+      <span class="nota">Prueba otra combinación</span>
+      ${lv.map((L,i)=>`<button class="trio" aria-pressed="${i===lookPortada}" aria-label="${esc(L.nombre)}" title="${esc(L.nombre)}" onclick="verLookPortada(${i})">${trioHtml(L.slots)}</button>`).join("")}
+    </div>`:""}
+  </section>
+
+  <dl class="franja">
+    <div><dt>Entrega local en Mexicali</dt><dd>${C.localDeliveryCost>0?peso(C.localDeliveryCost):"Gratis"}</dd></div>
+    <div><dt>Envío a todo México</dt><dd>${C.nationalShippingCost>0?peso(C.nationalShippingCost):"Gratis"}</dd></div>
+    ${C.freeShippingFrom>0?`<div><dt>Envío gratis en compras desde</dt><dd>${peso(C.freeShippingFrom)}</dd></div>`:""}
+  </dl>
+
+  <section class="bloque">
+    <header class="bloque-cab"><h2>La colección</h2><button class="enlace" onclick="catFiltro='Todo';go('tienda')">Ver las ${MODELOS.length} prendas</button></header>
+    <div class="familias">
+      ${fs.map(f=>{
+        const sel=modelo(famColor[f.nombre])||f.modelos.find(hayStock)||f.modelos[0];
+        return `<article class="familia" data-id="${sel.id}">
+          <button class="familia-fig" onclick="abre(this,this.parentElement.dataset.id)" aria-label="Ver ${esc(f.nombre)}">${figuraDe(sel,0)}</button>
+          <div class="familia-pie"><h3>${esc(f.nombre)}</h3><span class="precio">${peso(sel.precio)}</span></div>
+          <p class="nota">${f.modelos.length} colores, tallas ${tallasDe(f.modelos[0]).join(", ")}</p>
+          <div class="muestras">${f.modelos.map(m=>`<button class="sw chica${hayStock(m)?"":" agotada"}" style="background:${m.hex}" aria-pressed="${m.id===sel.id}"
+            aria-label="${esc(m.color)}" title="${esc(m.color)}" onclick="eligeFamilia(this,'${m.id}')"></button>`).join("")}</div>
+        </article>`;
+      }).join("")}
     </div>
   </section>
-  ${barraEnvioGratis()}
-  <div class="chips">${cats.map(c=>`<button class="chip ${catFiltro===c?'on':''}" onclick="catFiltro='${c}';go('tienda')">${c}</button>`).join("")}</div>
 
-  <section class="sec"><div class="sec-head"><h3 class="serif">Outfits armados por ROMA</h3></div></section>
-  <div class="carrusel">
-    ${LOOKS_ROMA.map((L,i)=>`<div class="look-card">
-      <div class="look-flat">${lookFlat(L.slots,.92)}</div>
-      <div class="look-body"><h4 class="serif">${L.nombre}</h4><p>${L.desc}</p>
-        <div class="look-cta"><b>${peso(lookPrecio(L.slots))}</b>
-          <div style="display:flex;gap:7px">
-            <button class="mini-btn sec2" onclick="abrirLookEnArmador(${i})">Editar</button>
-            <button class="mini-btn" onclick="lookAlCarrito(${i},this)">Llevar look</button>
-          </div></div></div>
-    </div>`).join("")}
-  </div>
-
-  <section class="sec"><div class="sec-head"><h3 class="serif">Nuevos lanzamientos</h3>
-    <button onclick="catFiltro='Nuevo';go('tienda')">Ver todo →</button></div></section>
-  <div class="carrusel">${nuevos.map(cardProducto).join("")}</div>
-
-  <section class="sec"><div class="sec-head"><h3 class="serif">Ofertas</h3>
-    <button onclick="catFiltro='Ofertas';go('tienda')">Ver todo →</button></div></section>
-  <div class="carrusel">${ofertas.map(cardProducto).join("")}</div>
+  ${otro?`<section class="invita">
+    <div class="invita-escena">${maniquiHtml(otro.slots,{escala:0.6})}</div>
+    <div class="invita-txt">
+      <h2>Vístelo antes de comprarlo</h2>
+      <p class="entrada">En el armador cada prenda cambia de color sobre el maniquí, con el tono real de la tela. Con jacket o playera más legging, el outfit lleva ${C.outfitDiscountPct} % de descuento.</p>
+      <button class="btn" onclick="go('armador')">Armar mi outfit</button>
+    </div>
+  </section>`:""}
   ${pieTienda()}`;
+}
+/* Cambiar el color de una familia en la portada, sin repintar la página. */
+function eligeFamilia(btn,id){
+  const m=modelo(id); if(!m) return;
+  famColor[m.nombre]=id;
+  const art=btn.closest&&btn.closest(".familia"); if(!art) return;
+  art.dataset.id=id;
+  const fig=art.querySelector(".familia-fig"); if(fig){ fig.innerHTML=figuraDe(m,0); montaLienzos(); }
+  const pr=art.querySelector(".precio"); if(pr) pr.textContent=peso(m.precio);
+  art.querySelectorAll(".sw").forEach(b=>b.setAttribute("aria-pressed",b===btn?"true":"false"));
 }
 
 function viewTienda(){
-  const cats=["Todo","Leggings","Playeras","Chamarras","Nuevo","Ofertas"];
-  let list=MODELOS;
-  if(catFiltro==="Nuevo") list=list.filter(m=>m.nuevo);
-  else if(catFiltro==="Ofertas") list=list.filter(m=>m.antes);
-  else if(catFiltro!=="Todo") list=list.filter(m=>m.cat===catFiltro);
+  const cats=["Todo",...new Set(familias().map(f=>f.cat))];
+  if(!cats.includes(catFiltro)) catFiltro="Todo";
+  let list=MODELOS.slice();
+  if(catFiltro!=="Todo") list=list.filter(m=>m.cat===catFiltro);
   if(filtroTalla) list=list.filter(m=>m.tallas[filtroTalla]&&m.tallas[filtroTalla].stock>0);
   if(filtroColor) list=list.filter(m=>m.color===filtroColor);
-  if(filtroDisp==='si') list=list.filter(m=>!m.agotado&&Object.values(m.tallas).some(v=>v.stock>0));
-  if(filtroPrecio==="menor") list=[...list].sort((a,b)=>a.precio-b.precio);
-  if(filtroPrecio==="mayor") list=[...list].sort((a,b)=>b.precio-a.precio);
-  const colores=[...new Set(MODELOS.map(m=>m.color))];
+  if(filtroDisp==="si") list=list.filter(hayStock);
+  if(filtroPrecio==="menor") list.sort((a,b)=>a.precio-b.precio);
+  else if(filtroPrecio==="mayor") list.sort((a,b)=>b.precio-a.precio);
+  else list.sort((a,b)=>(hayStock(b)?1:0)-(hayStock(a)?1:0));          // lo agotado, al final
+  const colores=[...new Set(MODELOS.map(m=>m.color))].sort((a,b)=>a.localeCompare(b,"es"));
+  const tallas=ORDEN_TALLAS.filter(t=>MODELOS.some(m=>m.tallas[t]));
+  const hayFiltro=filtroTalla||filtroColor||filtroPrecio||filtroDisp;
   return `
-  <h2 class="titulo serif">Tienda</h2>
-  <div class="chips">${cats.map(c=>`<button class="chip ${catFiltro===c?'on':''}" onclick="catFiltro='${c}';render()">${c}</button>`).join("")}</div>
+  <h1 class="titulo" tabindex="-1">Tienda</h1>
+  <div class="chips" role="group" aria-label="Tipo de prenda">${cats.map(c=>`<button class="chip" aria-pressed="${catFiltro===c}" onclick="catFiltro='${c}';render()">${c}</button>`).join("")}</div>
   <div class="filtros">
-    <select class="f-sel" onchange="filtroTalla=this.value;render()">
-      <option value="">Talla</option>${["S","M","L"].map(t=>`<option ${filtroTalla===t?'selected':''}>${t}</option>`).join("")}</select>
-    <select class="f-sel" onchange="filtroColor=this.value;render()">
-      <option value="">Color</option>${colores.map(c=>`<option ${filtroColor===c?'selected':''}>${c}</option>`).join("")}</select>
-    <select class="f-sel" onchange="filtroDisp=this.value;render()">
-      <option value="">Disponibilidad</option><option value="si" ${filtroDisp==='si'?'selected':''}>En existencia</option></select>
-    <select class="f-sel" onchange="filtroPrecio=this.value;render()">
-      <option value="">Precio</option><option value="menor" ${filtroPrecio==='menor'?'selected':''}>Menor a mayor</option>
-      <option value="mayor" ${filtroPrecio==='mayor'?'selected':''}>Mayor a menor</option></select>
-    ${(filtroTalla||filtroColor||filtroPrecio||filtroDisp)?`<button class="chip" onclick="filtroTalla='';filtroColor='';filtroPrecio='';render()">Limpiar ✕</button>`:""}
+    <label class="solo-lector" for="fTalla">Talla</label>
+    <select class="f-sel" id="fTalla" onchange="filtroTalla=this.value;render()">
+      <option value="">Talla</option>${tallas.map(t=>`<option ${filtroTalla===t?'selected':''}>${t}</option>`).join("")}</select>
+    <label class="solo-lector" for="fColor">Color</label>
+    <select class="f-sel" id="fColor" onchange="filtroColor=this.value;render()">
+      <option value="">Color</option>${colores.map(c=>`<option ${filtroColor===c?'selected':''}>${esc(c)}</option>`).join("")}</select>
+    <label class="solo-lector" for="fOrden">Orden</label>
+    <select class="f-sel" id="fOrden" onchange="filtroPrecio=this.value;render()">
+      <option value="">Orden</option><option value="menor" ${filtroPrecio==='menor'?'selected':''}>Precio: menor a mayor</option>
+      <option value="mayor" ${filtroPrecio==='mayor'?'selected':''}>Precio: mayor a menor</option></select>
+    <button class="chip" aria-pressed="${filtroDisp==='si'}" onclick="filtroDisp=filtroDisp==='si'?'':'si';render()">Solo disponibles</button>
+    ${hayFiltro?`<button class="enlace" onclick="filtroTalla='';filtroColor='';filtroPrecio='';filtroDisp='';render()">Quitar filtros</button>`:""}
   </div>
+  <p class="cuenta" role="status">${list.length===1?"1 prenda":list.length+" prendas"}</p>
   ${list.length?`<div class="grid">${list.map(cardProducto).join("")}</div>`
-   :`<div class="vacio-msg"><div class="big">◌</div><h3 class="serif">Sin resultados</h3><p>Prueba con otros filtros.</p></div>`}
+   :`<div class="vacio-msg"><h2>Nada con esos filtros</h2><p>Quita alguno para ver más prendas.</p>
+     <button class="btn btn-claro" onclick="filtroTalla='';filtroColor='';filtroPrecio='';filtroDisp='';catFiltro='Todo';render()">Ver todo</button></div>`}
   ${pieTienda()}`;
 }
 
 function viewProducto(){
   const m=modelo(vistaParam); if(!m) return viewTienda();
   ev("view_item",{items:evModelo(m),valor:m.precio});
-  const colorSel=fichaColorSel[m.nombre]||m.color;
-  const mSel=variantes(m.nombre).find(v=>v.color===colorSel)||m;
-  const tallaSel=fichaTallaSel[mSel.id]||"";
-  const rs=resenasDe(mSel.id);
-  const combos=sugerencias(mSel);
+  const C=CFG(), hermanos=variantes(m.nombre);
+  const tallaSel=(fichaTallaSel[m.id]&&m.tallas[fichaTallaSel[m.id]]&&m.tallas[fichaTallaSel[m.id]].stock>0)?fichaTallaSel[m.id]:"";
+  const rs=resenasDe(m.id), combos=sugerencias(m), ago=!hayStock(m);
+  const enManiqui=window.OMA_MANIQUI&&OMA_MANIQUI.tiene(m.base);
+  const slots={[m.tipo]:m.id};
+  const stockSel=tallaSel?m.tallas[tallaSel].stock:0;
   return `
-  <div class="back-row"><button onclick="go('tienda')">← Tienda</button></div>
-  <div class="ficha-fig" id="fichaFig" onclick="this.classList.toggle('zoom')">
-    ${mSel.antes?`<span class="tag oferta">OFERTA</span>`:mSel.nuevo?`<span class="tag">NUEVO</span>`:""}
-    ${figuraDe(mSel,300)}
-    <span class="zoom-hint">Toca para acercar</span>
-  </div>
-  ${(mSel.imagenes||[]).length>1?`<div style="display:flex;gap:8px;overflow-x:auto;padding:10px 20px 0">${mSel.imagenes.map((u,i)=>`<img src="${u}" onclick="modelo('${mSel.id}').imgPrincipal=${i};render()" style="width:58px;height:70px;object-fit:cover;border-radius:10px;border:2px solid ${i===(mSel.imgPrincipal||0)?'var(--oro)':'var(--linea)'}">`).join("")}</div>`:""}
-  <div class="ficha-body">
-    <div class="eyebrow">${mSel.cat}</div>
-    <h1 class="serif">${mSel.nombre}</h1>
-    <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
-      <span style="font-size:20px;font-weight:700">${peso(mSel.precio)}</span>
-      ${mSel.antes?`<s style="color:var(--gris)">${peso(mSel.antes)}</s>`:""}
-      <span style="flex:1"></span>
-      ${rs.total?`<span class="estrellas">★★★★★</span><b style="font-size:13px">${rs.total} reseña${rs.total===1?"":"s"}</b>`:""}
+  <div class="back-row"><button onclick="go('tienda')"><span aria-hidden="true">←</span> Tienda</button></div>
+  <div class="ficha">
+    <div class="ficha-galeria">
+      <div class="ficha-fig">${fichaVista==="maniqui"&&enManiqui ? maniquiHtml(slots) : figuraDe(m,0,{id:"fichaImg",prioridad:true})}</div>
+      ${enManiqui?`<div class="ficha-vistas" role="group" aria-label="Vistas">
+        <button class="vista-btn" aria-pressed="${fichaVista!=="maniqui"}" onclick="fichaVista='prenda';render()" aria-label="Ver la prenda sola">${prendaImg(m,0)}</button>
+        <button class="vista-btn" aria-pressed="${fichaVista==="maniqui"}" onclick="fichaVista='maniqui';render()">Puesta en maniquí</button>
+      </div>`:""}
     </div>
+    <div class="ficha-info">
+      <p class="migas"><button onclick="catFiltro='Todo';go('tienda')">Tienda</button> / <button onclick="catFiltro='${m.cat}';go('tienda')">${esc(m.cat)}</button></p>
+      <h1 tabindex="-1">${esc(m.nombre)}</h1>
+      <p class="ficha-precio">${peso(m.precio)}${m.antes?`<s>${peso(m.antes)}</s>`:""}</p>
 
-    <div class="opt-label">Color · ${colorSel}</div>
-    <div class="swatches">${variantes(m.nombre).map(v=>{
-      const [c]=COLORES[v.color]||["#999"];
-      return `<button class="sw ${v.color===colorSel?'on':''}" style="background:${c}" aria-label="${v.color}"
-        onclick="fichaColorSel['${m.nombre}']='${v.color}';fichaTallaSel['${v.id}']='';go('producto','${v.id}')"></button>`;}).join("")}</div>
+      <fieldset class="opcion">
+        <legend><span>Color: <b>${esc(m.color)}</b></span><span>${hermanos.length} colores</span></legend>
+        <div class="muestras">${hermanos.map(v=>`<button class="sw${hayStock(v)?"":" agotada"}" style="background:${v.hex}" aria-pressed="${v.id===m.id}"
+          aria-label="${esc(v.color)}${hayStock(v)?"":", agotado"}" title="${esc(v.color)}" onclick="cambiaColorFicha('${v.id}')"></button>`).join("")}</div>
+      </fieldset>
 
-    <div class="opt-label">Talla</div>
-    <div class="tallas">${["S","M","L"].map(t=>{
-      const v=mSel.tallas[t];
-      const ag=!v||v.stock<=0;
-      return `<button class="tl ${tallaSel===t?'on':''} ${ag?'agotada':''}"
-        onclick="fichaTallaSel['${mSel.id}']='${t}';render()">${t}</button>`;}).join("")}</div>
-    ${tallaSel&&mSel.tallas[tallaSel]&&mSel.tallas[tallaSel].stock<=2?`<p style="font-size:12px;color:var(--oro);font-weight:700;margin-top:8px">Últimas ${mSel.tallas[tallaSel].stock} piezas en ${tallaSel}</p>`:""}
-  </div>
+      <fieldset class="opcion">
+        <legend><span>Talla${tallaSel?": <b>"+tallaSel+"</b>":""}</span><a class="enlace" href="/guia-de-tallas/">Guía de tallas</a></legend>
+        <div class="tallas">${tallasDe(m).map(t=>{
+          const ag=m.tallas[t].stock<=0;
+          return `<button class="tl${ag?" agotada":""}" aria-pressed="${tallaSel===t}" ${ag?'disabled aria-label="'+t+', agotada"':""}
+            onclick="fichaTallaSel['${m.id}']='${t}';render()">${t}</button>`;}).join("")}</div>
+        ${tallaSel&&stockSel<=2?`<p class="ultimas">${stockSel===1?"Queda 1 pieza":"Quedan "+stockSel+" piezas"} en talla ${tallaSel}.</p>`:""}
+      </fieldset>
 
-  <div class="cta-fija">
-    <button class="btn-cart" onclick="fichaAdd('${mSel.id}',this)">Agregar al carrito · ${peso(mSel.precio)}</button>
-  </div>
+      <div class="ficha-acciones">
+        <button class="btn btn-ancho" id="btnAgregar" ${ago?"disabled":""} onclick="fichaAdd('${m.id}',this)">${ago?"Agotado":"Agregar a la bolsa"}</button>
+        ${enManiqui?`<button class="btn btn-claro btn-ancho" onclick="abrirEnArmador('${m.id}')">Armar un outfit con esta prenda</button>`:""}
+      </div>
 
-  <div class="combina">
-    <h3 class="serif">¿Con qué combinarlo?</h3>
-    <p>Complementa el look — y desbloquea el ${CFG().outfitDiscountPct}% del outfit completo.</p>
-    <div class="combo-row">
-      ${combos.map(c=>`<button class="combo-it" onclick="go('producto','${c.id}')">
-        <div class="cf">${prendaImg(c,0)}</div>
-        <span>${c.nombre}</span><small>${c.color} · ${peso(c.precio)}</small></button>`).join("")}
-      <button class="combo-it" style="background:var(--tinta);color:var(--papel)" onclick="abrirEnArmador('${mSel.id}')">
-        <div class="cf" style="font-size:26px;color:var(--oro-suave)">✦</div>
-        <span>Armar el look completo</span></button>
+      <div class="pliegues">
+        <details><summary>Envío y entrega</summary>
+          <p>Entrega local en Mexicali: ${C.localDeliveryCost>0?peso(C.localDeliveryCost):"gratis"}. Envío a todo México: ${C.nationalShippingCost>0?peso(C.nationalShippingCost):"gratis"}.${C.freeShippingFrom>0?" Gratis en compras desde "+peso(C.freeShippingFrom)+".":""}</p>
+          <p><a class="enlace" href="/envios/">Ver tiempos y detalles de envío</a></p></details>
+        <details><summary>Cambios y devoluciones</summary>
+          <p><a class="enlace" href="/cambios/">Consulta las condiciones de cambio</a></p></details>
+        <details><summary>Sobre esta imagen</summary>
+          <p>Es una ilustración 3D de referencia con el tono medido de la tela, no una fotografía. El color real puede variar un poco según tu pantalla.</p></details>
+      </div>
     </div>
   </div>
 
-  <div class="ficha-body">
-    <div class="opt-label">Reseñas</div>
-    ${rs.items.length ? rs.items.map(r=>`<div class="resena"><span class="estrellas" style="font-size:11px">${"★".repeat(r.estrellas||5)}</span><b> ${r.nombre}</b><p>${r.texto}</p></div>`).join("") : `<p style="font-size:13px;color:var(--gris)">Todavía no hay reseñas verificadas de esta prenda. Cuando la compres y nos cuentes tu experiencia, aparecerá aquí.</p>`}
-  </div>`;
+  ${combos.length?`<section class="bloque">
+    <header class="bloque-cab"><h2>Combínalo con</h2>
+      <span class="nota">Jacket o playera más legging: ${C.outfitDiscountPct} % menos</span></header>
+    <div class="grid" style="padding-inline:0">${combos.map(cardProducto).join("")}</div>
+  </section>`:""}
+
+  <section class="bloque">
+    <header class="bloque-cab"><h2>Reseñas</h2></header>
+    ${rs.items.length ? rs.items.map(r=>`<div class="orden" style="margin:0"><b>${esc(r.nombre)}</b><p>${esc(r.texto)}</p></div>`).join("")
+      : `<p class="nota">Esta prenda todavía no tiene reseñas de clientas. Aquí solo se publican las de compras verificadas.</p>`}
+  </section>
+  ${pieTienda()}`;
 }
+function cambiaColorFicha(id){
+  if(!modelo(id)) return;
+  const cambia=()=>{ vistaParam=id; render(); };
+  transita(cambia);
+}
+/* Qué ofrecer junto a una prenda: lo que le falta para ser outfit, en tonos afines. */
 function sugerencias(m){
+  const afin=x=>x.color===m.color||/^negro$/i.test(x.color)||/marfil|blanco/i.test(x.color);
   const out=[];
-  const negro=c=>c==="Negro";
-  const mismaGama=x=>x.color===m.color||negro(x.color)||["Beige","Blanco"].includes(x.color);
-  const pool=t=>MODELOS.filter(x=>x.tipo===t&&x.nombre!==m.nombre);
-  if(m.tipo!=="abajo"){ const b=pool("abajo").filter(mismaGama); out.push(...(b.length?b:pool("abajo")).slice(0,2)); }
-  if(m.tipo!=="arriba"){ const a=pool("arriba").filter(mismaGama); out.push(...(a.length?a:pool("arriba")).slice(0,1)); }
-  if(m.tipo!=="capa"){ const c=pool("capa").filter(mismaGama); out.push(...(c.length?c:pool("capa")).slice(0,1)); }
-  return out.slice(0,3);
+  ZONAS.filter(z=>z!==m.tipo).forEach(z=>{
+    const pool=MODELOS.filter(x=>x.tipo===z&&hayStock(x));
+    const mismo=pool.filter(x=>x.color===m.color), cerca=pool.filter(afin);
+    const pick=(mismo.length?mismo:cerca.length?cerca:pool).slice(0,z==="abajo"||m.tipo==="abajo"?2:1);
+    out.push(...pick);
+  });
+  return out.slice(0,4);
 }
 function fichaAdd(id,btn){
-  const m=modelo(id);
-  const t=fichaTallaSel[id];
-  if(!t){ toast("Elige tu talla primero"); return; }
+  const m=modelo(id), t=fichaTallaSel[id];
+  if(!t||!m.tallas[t]){ toast("Elige tu talla"); return; }
   if(addSku(m.tallas[t].sku)){
-    btn.classList.add("ok"); btn.textContent="✓ Agregado";
-    setTimeout(()=>{btn.classList.remove("ok");btn.textContent="Agregar al carrito · "+peso(m.precio);},1300);
+    btn.classList.add("ok"); btn.textContent="Agregado";
+    setTimeout(()=>{ btn.classList.remove("ok"); btn.textContent="Agregar a la bolsa"; },1400);
   }
 }
 
-/* ============ ARMADOR (feature insignia) ============ */
-function abrirEnArmador(id){ const m=modelo(id); outfit[m.tipo]=id; DB.save("outfit",outfit); slotActivo=m.tipo==="arriba"?"abajo":"arriba"; go("armador"); }
-function abrirLookEnArmador(i){ outfit={...LOOKS_ROMA[i].slots}; DB.save("outfit",outfit); go("armador"); }
-function lookAlCarrito(i,btn){ outfit={...LOOKS_ROMA[i].slots}; DB.save("outfit",outfit); go("armador"); setTimeout(()=>toast("Elige tallas y agrégalo en un tap"),350); }
-
+/* ============ ARMADOR ============ */
+function abrirEnArmador(id){
+  const m=modelo(id); if(!m) return;
+  outfit[m.tipo]=id; delete outfitTallas[m.tipo];
+  if(fichaTallaSel[id]) outfitTallas[m.tipo]=fichaTallaSel[id];
+  DB.save("outfit",outfit); DB.save("outfitTallas",outfitTallas); go("armador");
+}
+function totalOutfit(){
+  const ms=ZONAS.map(z=>outfit[z]&&modelo(outfit[z])).filter(Boolean);
+  const precio=ms.reduce((s,m)=>s+m.precio,0);
+  const completo=!!((outfit.arriba||outfit.capa)&&outfit.abajo);
+  const pct=CFG().outfitDiscountPct||0;
+  return { piezas:ms.length, precio, completo, pct, conDesc:completo?precio*(1-pct/100):precio };
+}
+function piezaHtml(z){
+  const pool=MODELOS.filter(m=>m.tipo===z);
+  if(!pool.length) return "";
+  const sel=outfit[z]&&modelo(outfit[z]);
+  const productos=[...new Set(pool.map(m=>m.nombre))];
+  const nombre=sel?sel.nombre:productos[0];
+  const colores=pool.filter(m=>m.nombre===nombre);
+  const talla=sel&&outfitTallas[z]&&sel.tallas[outfitTallas[z]]&&sel.tallas[outfitTallas[z]].stock>0?outfitTallas[z]:"";
+  return `<section class="pieza" data-zona="${z}">
+    <div class="pieza-cab"><h2>${esc(nombre)}</h2>
+      <span class="nota">${sel?`<b>${esc(sel.color)}</b>, ${peso(sel.precio)}`:(z==="capa"?"Opcional":"Elige un color")}</span></div>
+    ${productos.length>1?`<div class="prods">${productos.map(n=>`<button class="chip" aria-pressed="${n===nombre}" onclick="armaProducto('${z}','${esc(n)}')">${esc(n)}</button>`).join("")}</div>`:""}
+    <div class="muestras" role="group" aria-label="Color de ${esc(nombre)}">
+      ${colores.map(m=>`<button class="sw${hayStock(m)?"":" agotada"}" style="background:${m.hex}" aria-pressed="${!!sel&&sel.id===m.id}"
+        aria-label="${esc(m.color)}${hayStock(m)?"":", agotado"}" title="${esc(m.color)}" onclick="armaColor('${z}','${m.id}')"></button>`).join("")}
+    </div>
+    ${sel?`<div class="tallas" role="group" aria-label="Talla de ${esc(nombre)}">${tallasDe(sel).map(t=>{
+        const ag=sel.tallas[t].stock<=0;
+        return `<button class="tl${ag?" agotada":""}" aria-pressed="${talla===t}" ${ag?"disabled":""} onclick="armaTalla('${z}','${t}')">${t}</button>`;}).join("")}</div>
+      <div class="pieza-pie"><span class="nota">${talla?"Talla "+talla:"Elige tu talla"}</span><button class="quitar" onclick="armaColor('${z}',null)">Quitar</button></div>`:""}
+  </section>`;
+}
+function totalArmadorHtml(){
+  const T=totalOutfit();
+  return `<div class="suma">${T.piezas?(T.completo&&T.pct>0?`<s>${peso(T.precio)}</s>`:"")+peso(T.conDesc):"Elige tus prendas"}
+      ${T.completo&&T.pct>0?`<small>Outfit completo: ahorras ${peso(T.precio-T.conDesc)}</small>`:(T.piezas&&T.pct>0?`<small style="color:var(--texto2)">Suma ${outfit.abajo?"una jacket o playera":"un legging"} y baja ${T.pct} %</small>`:"")}</div>
+    <button class="btn" ${T.piezas?"":"disabled"} onclick="outfitAlCarrito()">Agregar a la bolsa</button>`;
+}
 function viewArmador(){
-  const a=outfit.arriba&&modelo(outfit.arriba), b=outfit.abajo&&modelo(outfit.abajo), c=outfit.capa&&modelo(outfit.capa);
-  const precio=(a?a.precio:0)+(b?b.precio:0)+(c?c.precio:0);
-  const completo=!!((a||c)&&b);
-  const pctLook=CFG().outfitDiscountPct;
-  const conDesc=completo?precio*(1-pctLook/100):precio;
-
-  /* Cada prenda vive en su propia zona: capa y arriba comparten la fila
-     superior (lado a lado, sin encimarse) y abajo ocupa la fila inferior. */
-  const zona=(k,label)=>{
-    const m=outfit[k]&&modelo(outfit[k]);
-    const activo = slotActivo===k ? " activo" : "";
-    if(!m) return `<button class="zona vacia${activo}" data-z="${k}" onclick="slotActivo='${k}';render()">
-      <span class="mas">+</span><span class="zl">${label}</span></button>`;
-    const fig = prendaImg(m,0);
-    return `<button class="zona llena${activo}" data-z="${k}" onclick="slotActivo='${k}';render()">
-      <span class="zfig">${fig}</span>
-      <span class="zt">${m.nombre.replace("Leggings ","")}<small>${m.color}</small></span>
-      <span class="zq" onclick="event.stopPropagation();outfit['${k}']=null;DB.save('outfit',outfit);render()" role="button" aria-label="Quitar">✕</span>
-    </button>`;
-  };
-
-  const pickPool=MODELOS.filter(m=>m.tipo===slotActivo);
-  const etiqueta={arriba:"Arriba",abajo:"Abajo",capa:"Capa"};
-  return `
-  <h2 class="titulo serif">Arma tu outfit</h2>
-  <p class="subtitulo">Elige una zona y escoge la prenda. Arriba + abajo = ${pctLook}% de descuento.</p>
-
-  <div class="lienzo">
-    <span class="sello ${completo?"on":""}">LOOK ROMA −${pctLook}%</span>
-    <div class="lienzo-sup">
-      ${zona("arriba","Arriba")}
-      ${zona("capa","Capa · opcional")}
+  const T=totalOutfit();
+  return `<div class="armador">
+    <div class="armador-escena">${maniquiHtml(outfit,{id:"mqArmador"})}</div>
+    <div class="armador-panel">
+      <h1 tabindex="-1">Arma tu outfit</h1>
+      <p class="entrada">Toca un color y míralo puesto.${T.pct>0?" Con jacket o playera más legging, el outfit lleva "+T.pct+" % de descuento.":""}</p>
+      <div id="armadorPiezas">${ZONAS.map(piezaHtml).join("")}</div>
+      <div class="armador-extra">
+        <button class="btn btn-claro" id="btnGuardarLook" ${T.piezas?"":"disabled"} onclick="guardarLook()">Guardar look</button>
+        <button class="btn btn-claro" id="btnCompartirLook" ${T.piezas?"":"disabled"} onclick="compartirLook()">Compartir</button>
+      </div>
+      <div class="armador-total" id="armadorTotal">${totalArmadorHtml()}</div>
     </div>
-    <div class="lienzo-inf">
-      ${zona("abajo","Abajo")}
-    </div>
-  </div>
-
-  <div class="resumen-look">
-    <div>
-      <div class="tt">${completo?"Look completo":"Tu look va tomando forma"}</div>
-      <div class="pp">${peso(conDesc)}${completo?`<small>ahorras ${peso(precio-conDesc)}</small>`:""}</div>
-    </div>
-    ${(a||b||c)?`<button class="mini-btn sec2" onclick="outfit={arriba:null,abajo:null,capa:null};DB.save('outfit',outfit);render()">Vaciar</button>`:""}
-  </div>
-
-  <div class="pick-row">
-    <h4>Elige ${etiqueta[slotActivo]||"la prenda"}</h4>
-    <div class="pick-scroll">
-      ${pickPool.map(m=>`<button class="pick ${outfit[slotActivo]===m.id?"on":""}" onclick="outfit['${slotActivo}']='${m.id}';DB.save('outfit',outfit);render()">
-        <span class="pf">${prendaImg(m,0)}</span>
-        <span class="pn">${m.nombre.replace("Leggings ","")}<small>${m.color}</small></span></button>`).join("")}
-    </div>
-  </div>
-
-  <div class="armador-cta">
-    <button class="btn-cart" onclick="outfitAlCarrito(this)" ${!(a||b||c)?"disabled style='opacity:.4'":""}>Agregar todo el outfit al carrito${completo?" · "+peso(conDesc):""}</button>
-    <div style="display:flex;gap:10px">
-      <button class="btn-linea" style="flex:1" onclick="guardarLook()" ${!(a||b||c)?"disabled style='flex:1;opacity:.4'":""}>♡ Guardar en Mis Looks</button>
-      <button class="btn-linea" style="flex:1" onclick="compartirLook()" ${!(a||b||c)?"disabled style='flex:1;opacity:.4'":""}>↗ Compartir</button>
-    </div>
-  </div>
-`;
+  </div>`;
 }
-function pideTallasOutfit(cb){
-  const piezas=["capa","arriba","abajo"].filter(k=>outfit[k]).map(k=>modelo(outfit[k]));
-  const html=`<div class="hoja-bg" id="hojaBg" onclick="if(event.target===this)this.remove()"><div class="hoja">
-    <div class="asa"></div><h3 class="serif" style="font-size:24px;margin-bottom:2px">Tallas del outfit</h3>
-    <p style="color:var(--gris);font-size:13px;margin-bottom:14px">Elige la talla de cada pieza.</p>
-    ${piezas.map(m=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--linea)">
-      <div class="ht-fig">${prendaImg(m,0)}</div>
-      <div style="flex:1"><b style="font-size:13.5px">${m.nombre}</b><br><small style="color:var(--gris)">${m.color}</small></div>
-      <div class="tallas" style="gap:6px">${["S","M","L"].map(t=>{
-        const v=m.tallas[t], ag=!v||v.stock<=0;
-        return `<button class="tl ${ag?'agotada':''}" data-mid="${m.id}" data-t="${t}" style="min-width:38px;padding:8px 0;font-size:12.5px"
-          onclick="this.parentElement.querySelectorAll('.tl').forEach(x=>x.classList.remove('on'));this.classList.add('on')">${t}</button>`;}).join("")}</div>
-    </div>`).join("")}
-    <button class="btn-cart" style="width:100%;margin-top:18px" id="hojaOk">Confirmar y agregar</button>
-  </div></div>`;
-  document.body.insertAdjacentHTML("beforeend",html);
-  $("hojaOk").onclick=()=>{
-    const sel={};
-    document.querySelectorAll("#hojaBg .tl.on").forEach(b=>sel[b.dataset.mid]=b.dataset.t);
-    if(Object.keys(sel).length<piezas.length){ toast("Falta elegir talla en alguna pieza"); return; }
-    $("hojaBg").remove(); cb(sel);
-  };
+/* Cambiar algo en el armador repinta el maniquí y el panel, no la página:
+   el maniquí no parpadea y la pantalla no brinca. */
+function refrescaArmador(){
+  DB.save("outfit",outfit); DB.save("outfitTallas",outfitTallas);
+  const caja=$("armadorPiezas");
+  if(!caja||!caja.querySelectorAll){ render(); return; }
+  caja.innerHTML=ZONAS.map(piezaHtml).join("");
+  const tot=$("armadorTotal"); if(tot) tot.innerHTML=totalArmadorHtml();
+  const hay=totalOutfit().piezas>0;
+  ["btnGuardarLook","btnCompartirLook"].forEach(id=>{ const b=$(id); if(b) b.disabled=!hay; });
+  const cv=$("mqArmador");
+  if(cv){ pintaManiqui(cv,prendasDe(outfit)); if(cv.setAttribute) cv.setAttribute("aria-label",altOutfit(outfit)); }
 }
-function outfitAlCarrito(btn){
-  pideTallasOutfit(sel=>{
-    let ok=true;
-    Object.entries(sel).forEach(([mid,t])=>{ if(!addSku(modelo(mid).tallas[t].sku,1,true)) ok=false; });
-    if(lookCompletoEnCarrito()&&!codigoAplicado){ codigoAplicado="LOOK15"; DB.save("codigo",codigoAplicado); }
-    toast(ok?"Outfit agregado · LOOK15 aplicado":"Outfit agregado (revisa disponibilidad)");
-    go("carrito");
-  });
+function armaColor(z,id){
+  if(id&&!modelo(id)) return;
+  if(outfit[z]===id) return;
+  outfit[z]=id||null;
+  const m=id&&modelo(id);
+  if(!m) delete outfitTallas[z];
+  else if(outfitTallas[z]&&!(m.tallas[outfitTallas[z]]&&m.tallas[outfitTallas[z]].stock>0)) delete outfitTallas[z];
+  refrescaArmador();
+}
+function armaProducto(z,nombre){
+  const m=MODELOS.find(x=>x.tipo===z&&x.nombre===nombre&&hayStock(x))||MODELOS.find(x=>x.tipo===z&&x.nombre===nombre);
+  if(m) armaColor(z,m.id);
+}
+function armaTalla(z,t){ outfitTallas[z]=t; refrescaArmador(); }
+function outfitAlCarrito(){
+  const zonas=ZONAS.filter(z=>outfit[z]&&modelo(outfit[z]));
+  if(!zonas.length) return;
+  const falta=zonas.find(z=>{const m=modelo(outfit[z]);return !(outfitTallas[z]&&m.tallas[outfitTallas[z]]&&m.tallas[outfitTallas[z]].stock>0);});
+  if(falta){
+    toast("Elige la talla de "+modelo(outfit[falta]).nombre.toLowerCase());
+    const sec=document.querySelector&&document.querySelector('.pieza[data-zona="'+falta+'"]');
+    if(sec&&sec.scrollIntoView) sec.scrollIntoView({behavior:quieto()?"auto":"smooth",block:"center"});
+    return;
+  }
+  let ok=true;
+  zonas.forEach(z=>{ if(!addSku(modelo(outfit[z]).tallas[outfitTallas[z]].sku,1,true)) ok=false; });
+  if(lookCompletoEnCarrito()&&!codigoAplicado){ codigoAplicado="OUTFIT"; DB.save("codigo",codigoAplicado); }
+  toast(ok?(codigoAplicado==="OUTFIT"?"Outfit en tu bolsa, con su descuento":"Outfit en tu bolsa"):"Revisa tu bolsa: alguna pieza ya no alcanzó");
+  go("carrito");
 }
 function guardarLook(){
+  if(!ZONAS.some(z=>outfit[z])) return;
   const nombre=prompt("Ponle nombre a tu look:","Mi look "+(looks.length+1));
   if(nombre===null) return;
-  looks.unshift({id:Date.now(),nombre:nombre||("Mi look "+(looks.length+1)),slots:{...outfit}});
-  DB.save("looks",looks); toast("Guardado en Mis Looks ♡");
+  looks.unshift({id:Date.now(),nombre:(nombre||"").trim()||("Mi look "+(looks.length+1)),slots:Object.assign({},outfit)});
+  DB.save("looks",looks); toast("Guardado en tus looks");
 }
-
-/* compartir look como imagen */
+/* Compartir el look como imagen (1080 x 1350, formato de Instagram). */
 async function compartirLook(){
   try{
+    const ms=ZONAS.map(z=>outfit[z]&&modelo(outfit[z])).filter(Boolean); if(!ms.length) return;
     const cv=document.createElement("canvas"); cv.width=1080; cv.height=1350;
     const x=cv.getContext("2d");
-    x.fillStyle="#FAF8F3"; x.fillRect(0,0,1080,1350);
-    x.fillStyle="#C9A85C"; x.fillRect(0,0,1080,14);
-    x.fillStyle="#141210"; x.font="700 92px Cormorant Garamond, serif"; x.textAlign="center";
-    x.fillText("R O M A",540,150);
-    x.font="600 30px Inter, sans-serif"; x.fillStyle="#B08D3E"; x.fillText("S P O R T S W E A R",540,200);
-    /* Dibuja una prenda centrada en su celda, respetando su proporcion. */
-    const dib=async(m,cx,cy,caja)=>{ if(!m) return;
-      const url=render3D(m);
-      const img=new Image();
-      if(url){ img.src=url; }
-      else { const h=caja;
-        img.src="data:image/svg+xml;utf8,"+encodeURIComponent(svgPrenda(m.forma,m.color,h).replace('height="'+h+'"','width="'+Math.round(h*100/130)+'" height="'+h+'"')); }
-      await new Promise(r=>{img.onload=r;img.onerror=r;});
-      if(!img.width||!img.height) return;
-      const esc=Math.min(caja/img.width, caja/img.height);
-      const w=img.width*esc, hh=img.height*esc;
-      x.drawImage(img, cx-w/2, cy-hh/2, w, hh);
-    };
-    const a=outfit.arriba&&modelo(outfit.arriba), b=outfit.abajo&&modelo(outfit.abajo), c=outfit.capa&&modelo(outfit.capa);
-    const piezas=[c,a,b].filter(Boolean);
-    /* Reparte el ancho entre las piezas elegidas: nunca se montan. */
-    const anchoCelda = 900/Math.max(piezas.length,1);
-    for(let i=0;i<piezas.length;i++){
-      await dib(piezas[i], 90+anchoCelda*(i+0.5), 620, Math.min(anchoCelda*0.92, 520));
-    }
-    let y=1090; x.fillStyle="#141210"; x.font="600 40px Inter,sans-serif"; x.textAlign="left";
-    [c,a,b].filter(Boolean).forEach(m=>{ x.fillText(m.nombre+" · "+m.color,120,y); x.textAlign="right"; x.fillText("$"+m.precio,960,y); x.textAlign="left"; y+=60; });
-    x.fillStyle="#B08D3E"; x.font="700 46px Inter,sans-serif";
-    const tot=(a?a.precio:0)+(b?b.precio:0)+(c?c.precio:0);
-    x.fillText("Look completo: $"+Math.round(((a||c)&&b)?tot*(1-CFG().outfitDiscountPct/100):tot),120,y+30);
+    const g=x.createRadialGradient(360,480,60,360,620,900); g.addColorStop(0,"#F3ECE1"); g.addColorStop(1,"#E2D6C5");
+    x.fillStyle=g; x.fillRect(0,0,1080,1350);
+    const man=await OMA_MANIQUI.aLienzo(prendasDe(outfit));
+    const alto=1210, ancho=alto*man.width/man.height;
+    x.drawImage(man,150,70,ancho,alto);
+    const logo=await new Promise(r=>{const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src="/marca/oma-logo-claro.png";});
+    if(logo){ const w=330; x.drawImage(logo,650,150,w,w*logo.height/logo.width); }
+    let y=470; x.textAlign="left";
+    ms.forEach(m=>{
+      x.fillStyle=m.hex; x.beginPath(); x.arc(668,y-10,13,0,Math.PI*2); x.fill();
+      x.strokeStyle="rgba(25,25,25,.2)"; x.lineWidth=1; x.stroke();
+      x.fillStyle="#191919"; x.font="500 40px 'Cormorant Garamond', serif"; x.fillText(m.nombre,698,y);
+      x.fillStyle="#655D54"; x.font="400 24px Montserrat, sans-serif"; x.fillText(m.color+"  "+peso(m.precio),698,y+38);
+      y+=118;
+    });
+    const T=totalOutfit();
+    x.fillStyle="#B79A70"; x.fillRect(650,y-34,330,1);
+    x.fillStyle="#191919"; x.font="600 30px Montserrat, sans-serif"; x.fillText(peso(T.conDesc),650,y+26);
+    if(T.completo&&T.pct>0){ x.fillStyle="#655D54"; x.font="400 22px Montserrat, sans-serif"; x.fillText("Outfit completo, "+T.pct+" % menos",650,y+62); }
     const blob=await new Promise(r=>cv.toBlob(r,"image/png"));
-    const file=new File([blob],"mi-look-roma.png",{type:"image/png"});
-    if(navigator.canShare&&navigator.canShare({files:[file]})) await navigator.share({files:[file],title:"Mi look ROMA"});
-    else{ const u=URL.createObjectURL(blob); const l=document.createElement("a"); l.href=u; l.download="mi-look-roma.png"; l.click(); setTimeout(()=>URL.revokeObjectURL(u),3000); toast("Imagen del look generada"); }
-  }catch(e){ if(e&&e.name!=="AbortError") toast("No se pudo compartir"); }
+    const file=new File([blob],"mi-look-oma.png",{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})) await navigator.share({files:[file],title:"Mi look OMA"});
+    else{ const u=URL.createObjectURL(blob); const l=document.createElement("a"); l.href=u; l.download="mi-look-oma.png"; l.click(); setTimeout(()=>URL.revokeObjectURL(u),3000); toast("Imagen descargada"); }
+  }catch(e){ if(e&&e.name!=="AbortError") toast("No se pudo crear la imagen"); }
 }
 
 function viewLooks(){
-  return `<h2 class="titulo serif">Mis Looks</h2>
-  ${looks.length?"":`<div class="vacio-msg"><div class="big">♡</div><h3 class="serif">Aún no guardas looks</h3>
-    <p>Arma tu primer outfit y guárdalo aquí.</p>
-    <button class="btn-oro" style="margin-top:16px" onclick="go('armador')"><span class="fl">✦</span> Ir al armador</button></div>`}
-  <div style="padding:6px 20px;display:flex;flex-direction:column;gap:16px">
-  ${looks.map(L=>`<div class="look-card" style="width:auto">
-    <div class="look-flat">${lookFlat(L.slots,.92)}</div>
-    <div class="look-body"><h4 class="serif">${L.nombre}</h4>
-      <p>${["capa","arriba","abajo"].filter(k=>L.slots[k]).map(k=>modelo(L.slots[k]).nombre).join(" + ")}</p>
-      <div class="look-cta"><b>${peso(lookPrecio(L.slots))}</b>
-        <div style="display:flex;gap:7px">
-          <button class="mini-btn sec2" onclick="looks=looks.filter(x=>x.id!==${L.id});DB.save('looks',looks);render()">Borrar</button>
-          <button class="mini-btn sec2" onclick="outfit={...(looks.find(x=>x.id===${L.id}).slots)};DB.save('outfit',outfit);go('armador')">Editar</button>
-          <button class="mini-btn" onclick="outfit={...(looks.find(x=>x.id===${L.id}).slots)};DB.save('outfit',outfit);outfitAlCarrito()">Llevar</button>
-        </div></div></div>
-  </div>`).join("")}
-  </div>`;
+  return `<h1 class="titulo" tabindex="-1">Tus looks</h1>
+  ${looks.length?`<div class="looks">${looks.map(L=>`<article class="look">
+    <div class="look-escena">${maniquiHtml(L.slots,{escala:0.5})}</div>
+    <h3>${esc(L.nombre)}</h3>
+    <p class="nota">${ZONAS.filter(k=>L.slots[k]&&modelo(L.slots[k])).map(k=>{const m=modelo(L.slots[k]);return esc(m.nombre+" "+m.color.toLowerCase());}).join(", ")}. ${peso(lookPrecio(L.slots))}</p>
+    <div class="acciones">
+      <button class="mini-btn" onclick="usaLook(${L.id})">Abrir en el armador</button>
+      <button class="mini-btn sec2" onclick="looks=looks.filter(x=>x.id!==${L.id});DB.save('looks',looks);render()">Borrar</button>
+    </div></article>`).join("")}</div>`
+  :`<div class="vacio-msg"><h2>Aún no guardas ningún look</h2><p>Arma un outfit y guárdalo para volver a él después.</p>
+    <button class="btn" onclick="go('armador')">Armar mi outfit</button></div>`}`;
+}
+function usaLook(id){
+  const L=looks.find(x=>x.id===id); if(!L) return;
+  outfit=Object.assign({arriba:null,abajo:null,capa:null},L.slots); outfitTallas={};
+  DB.save("outfit",outfit); DB.save("outfitTallas",outfitTallas); go("armador");
 }
 
-/* ============ CARRITO ============ */
+/* ============ BOLSA ============ */
 function viewCarrito(){
   ev("view_cart",{items:evItems(carrito),valor:totales().total});
-  if(!carrito.length) return `<h2 class="titulo serif">Carrito</h2>
-    <div class="vacio-msg"><div class="big">🛍</div><h3 class="serif">Tu carrito está vacío</h3>
-    <p>El armador es el mejor lugar para empezar.</p>
-    <button class="btn-oro" style="margin-top:16px" onclick="go('armador')"><span class="fl">✦</span> Armar un outfit</button></div>`;
-  const T=totales();
-  const sugerirLook = lookCompletoEnCarrito() && !codigoAplicado;
+  if(!carrito.length) return `<h1 class="titulo" tabindex="-1">Tu bolsa</h1>
+    <div class="vacio-msg"><h2>Tu bolsa está vacía</h2><p>Empieza por la colección o arma un outfit en el maniquí.</p>
+    <button class="btn" onclick="go('tienda')">Ver la colección</button>
+    <button class="btn btn-claro" onclick="go('armador')">Armar mi outfit</button></div>`;
+  const T=totales(), C=CFG();
+  const sugerir = lookCompletoEnCarrito() && !codigoAplicado && C.outfitDiscountPct>0;
   const items=carrito.map((i,idx)=>{
-    const {m,talla,stock}=skuInfo(i.sku);
+    const {m,talla}=skuInfo(i.sku);
     return `<div class="c-item">
       <div class="c-fig">${prendaImg(m,0)}</div>
-      <div class="c-info"><b>${m.nombre}</b><small>${m.color}</small>
+      <div class="c-info"><b>${esc(m.nombre)}</b><small><i class="punto" style="background:${m.hex}"></i>${esc(m.color)}</small>
         <div class="c-edit">
-          <select onchange="cambiaTalla(${idx},this.value)">${["S","M","L"].map(t=>{
-            const v=m.tallas[t]; return v&&v.stock>0?`<option ${t===talla?'selected':''}>${t}</option>`:``;}).join("")}</select>
-          <select onchange="cambiaColor(${idx},this.value)">${variantes(m.nombre).map(v=>`<option ${v.color===m.color?'selected':''}>${v.color}</option>`).join("")}</select>
-          <div class="qty"><button onclick="cambiaCant(${idx},-1)">−</button><span>${i.cant}</span><button onclick="cambiaCant(${idx},1)">+</button></div>
+          <select aria-label="Talla" onchange="cambiaTalla(${idx},this.value)">${tallasDe(m).map(t=>m.tallas[t].stock>0?`<option ${t===talla?'selected':''}>${t}</option>`:"").join("")}</select>
+          <select aria-label="Color" onchange="cambiaColor(${idx},this.value)">${variantes(m.nombre).map(v=>`<option ${v.color===m.color?'selected':''}>${esc(v.color)}</option>`).join("")}</select>
+          <div class="qty"><button aria-label="Quitar una" onclick="cambiaCant(${idx},-1)">−</button><span aria-live="polite">${i.cant}</span><button aria-label="Agregar una" onclick="cambiaCant(${idx},1)">+</button></div>
         </div></div>
       <div class="c-precio">${peso(m.precio*i.cant)}<button onclick="quitaItem(${idx})">Quitar</button></div>
     </div>`;}).join("");
-  return `<h2 class="titulo serif">Carrito</h2>
-  ${lookCompletoEnCarrito()?`<p class="subtitulo" style="color:var(--verde);font-weight:600">✓ Traes el look completo</p>`:""}
-  ${items}
-  <div class="panel">
-    <h4>Código promocional</h4>
-    <div class="cod-row">
-      <input id="codIn" placeholder="EJ. ROMA10" value="${codigoAplicado||""}" ${codigoAplicado?'class="ok"':''}>
-      ${codigoAplicado
-        ? `<button class="mini-btn sec2" onclick="codigoAplicado=null;DB.save('codigo',null);render()">Quitar</button>`
-        : `<button class="mini-btn" onclick="aplicaCodigo()">Aplicar</button>`}
+  return `<h1 class="titulo" tabindex="-1">Tu bolsa</h1>
+  <div class="dos-col">
+    <div>${items}</div>
+    <div class="lateral" style="padding-top:18px">
+      ${barraEnvioGratis()}
+      <div class="panel">
+        <h4>Código de descuento</h4>
+        <div class="cod-row">
+          <label class="solo-lector" for="codIn">Código</label>
+          <input id="codIn" autocomplete="off" autocapitalize="characters" value="${esc(codigoAplicado&&codigoAplicado!=="OUTFIT"?codigoAplicado:"")}" ${codigoAplicado&&codigoAplicado!=="OUTFIT"?'class="ok"':''}>
+          ${codigoAplicado&&codigoAplicado!=="OUTFIT"
+            ? `<button class="mini-btn sec2" onclick="codigoAplicado=null;DB.save('codigo',null);render()">Quitar</button>`
+            : `<button class="mini-btn" onclick="aplicaCodigo()">Aplicar</button>`}
+        </div>
+        <div class="cod-msg ${codigoAplicado?'ok':''}" id="codMsg" role="status">${codigoAplicado&&CODIGOS[codigoAplicado]?esc(CODIGOS[codigoAplicado].desc):""}</div>
+        ${sugerir?`<div class="cupon"><div><b>Traes el outfit completo</b><small>Lleva ${C.outfitDiscountPct} % de descuento.</small></div>
+          <button class="mini-btn" onclick="codigoAplicado='OUTFIT';DB.save('codigo','OUTFIT');render()">Aplicar</button></div>`:""}
+      </div>
+      <div class="panel">
+        <h4>Entrega</h4>
+        <div class="entrega">
+          <button class="ent-opt" aria-pressed="${entrega==='local'}" onclick="entrega='local';DB.save('entrega','local');render()">
+            <b>Entrega local en Mexicali</b><small>${C.localDeliveryCost>0?peso(C.localDeliveryCost):"Gratis"}${C.freeShippingFrom>0?", gratis desde "+peso(C.freeShippingFrom):""}</small></button>
+          <button class="ent-opt" aria-pressed="${entrega==='nacional'}" onclick="entrega='nacional';DB.save('entrega','nacional');render()">
+            <b>Envío a todo México</b><small>${C.nationalShippingCost>0?peso(C.nationalShippingCost):"Gratis"}${C.freeShippingFrom>0?", gratis desde "+peso(C.freeShippingFrom):""}</small></button>
+          <button class="ent-opt" aria-pressed="${entrega==='pickup'}" onclick="entrega='pickup';DB.save('entrega','pickup');render()">
+            <b>Recoger en persona</b><small>${esc(C.pickupAddress)}. Sin costo.</small></button>
+        </div>
+        <div style="margin-top:16px">
+          <div class="tot-row"><span>Subtotal</span><span>${peso(T.sub)}</span></div>
+          ${T.desc>0?`<div class="tot-row"><span>Descuento ${esc(T.etiqueta)}</span><span class="verde">−${peso(T.desc)}</span></div>`:""}
+          <div class="tot-row"><span>Entrega</span><span>${T.envio===0?'<span class="verde">Gratis</span>':peso(T.envio)}</span></div>
+          <div class="tot-row big"><span>Total</span><span>${peso(T.total)}</span></div>
+        </div>
+      </div>
+      <div class="pie-pago"><button class="btn btn-ancho" onclick="go('checkout')">Continuar al pago</button></div>
     </div>
-    <div class="cod-msg ${codigoAplicado?'ok':''}" id="codMsg">${codigoAplicado?("✓ "+CODIGOS[codigoAplicado].desc):""}</div>
-    ${sugerirLook?`<div class="cupon"><div><b>LOOK15</b><small>Tu look completo tiene ${CFG().outfitDiscountPct}% — aplícalo</small></div>
-      <button class="mini-btn" onclick="codigoAplicado='LOOK15';DB.save('codigo','LOOK15');render()">Aplicar</button></div>`:""}
-  </div>
-  <div class="panel">
-    <h4>Entrega</h4>
-    <div class="entrega" style="grid-template-columns:1fr">
-      <button class="ent-opt ${entrega==='pickup'?'on':''}" onclick="entrega='pickup';DB.save('entrega','pickup');render()">
-        <b>Recoger personalmente</b><small>${CFG().pickupAddress} · Gratis</small></button>
-      <button class="ent-opt ${entrega==='local'?'on':''}" onclick="entrega='local';DB.save('entrega','local');render()">
-        <b>Entrega local en Mexicali</b><small>${CFG().localDeliveryCost>0?peso(CFG().localDeliveryCost):"Gratis"}${CFG().freeShippingFrom>0?" · Gratis desde "+peso(CFG().freeShippingFrom):""}</small></button>
-      <button class="ent-opt ${entrega==='nacional'?'on':''}" onclick="entrega='nacional';DB.save('entrega','nacional');render()">
-        <b>Envío nacional</b><small>${CFG().nationalShippingCost>0?peso(CFG().nationalShippingCost):"Gratis"}${CFG().freeShippingFrom>0?" · Gratis desde "+peso(CFG().freeShippingFrom):""}</small></button>
-    </div>
-    <div style="margin-top:14px">
-      <div class="tot-row"><span>Subtotal</span><span>${peso(T.sub)}</span></div>
-      ${T.desc>0?`<div class="tot-row"><span>Descuento ${T.etiqueta}</span><span class="verde">−${peso(T.desc)}</span></div>`:""}
-      <div class="tot-row"><span>Envío</span><span>${T.envio===0?'<span class="verde">Gratis</span>':peso(T.envio)}</span></div>
-      <div class="tot-row big"><span>Total</span><span>${peso(T.total)}</span></div>
-    </div>
-  </div>
-  <div style="margin:4px 20px 10px"><button class="btn-cart" style="width:100%" onclick="go('checkout')">Continuar · ${peso(T.total)}</button></div>`;
+  </div>`;
 }
 function aplicaCodigo(){
-  const inp=$("codIn"), v=validaCodigo(inp.value);
-  const msg=$("codMsg");
+  const inp=$("codIn"), v=validaCodigo(inp.value), msg=$("codMsg");
   if(v.ok){ codigoAplicado=v.cod; DB.save("codigo",v.cod); render(); }
-  else{ inp.classList.remove("mal"); void inp.offsetWidth; inp.classList.add("mal");
-    msg.textContent=v.msg; msg.className="cod-msg mal"; }
+  else{ inp.classList.remove("mal"); void inp.offsetWidth; inp.classList.add("mal"); msg.textContent=v.msg; msg.className="cod-msg mal"; }
 }
 function cambiaCant(idx,d){
   const it=carrito[idx], info=skuInfo(it.sku);
-  if(d>0&&it.cant+1>info.stock){ toast("Solo hay "+info.stock+" disponibles"); return; }
+  if(d>0&&it.cant+1>info.stock){ toast(info.stock===1?"Solo queda 1 pieza":"Solo quedan "+info.stock+" piezas"); return; }
   it.cant+=d; if(it.cant<=0) carrito.splice(idx,1);
   DB.save("carrito",carrito); render();
 }
 function quitaItem(idx){ carrito.splice(idx,1); DB.save("carrito",carrito); render(); }
 function cambiaTalla(idx,t){
   const info=skuInfo(carrito[idx].sku);
-  const v=info.m.tallas[t]; if(!v||v.stock<=0){ toast("Sin stock en "+t); render(); return; }
+  const v=info.m.tallas[t]; if(!v||v.stock<=0){ toast("La talla "+t+" está agotada"); render(); return; }
   carrito[idx].sku=v.sku; carrito[idx].cant=Math.min(carrito[idx].cant,v.stock);
   fusiona(); DB.save("carrito",carrito); render();
 }
 function cambiaColor(idx,color){
   const info=skuInfo(carrito[idx].sku);
   const nuevoM=variantes(info.m.nombre).find(v=>v.color===color); if(!nuevoM) return;
-  const t=Object.keys(nuevoM.tallas).find(t=>t===info.talla&&nuevoM.tallas[t].stock>0)||Object.keys(nuevoM.tallas).find(t=>nuevoM.tallas[t].stock>0);
+  const t=tallasDe(nuevoM).find(t=>t===info.talla&&nuevoM.tallas[t].stock>0)||tallasDe(nuevoM).find(t=>nuevoM.tallas[t].stock>0);
   if(!t){ toast("Ese color está agotado"); render(); return; }
+  if(t!==info.talla) toast("En ese color queda la talla "+t);
   carrito[idx].sku=nuevoM.tallas[t].sku; carrito[idx].cant=Math.min(carrito[idx].cant,nuevoM.tallas[t].stock);
   fusiona(); DB.save("carrito",carrito); render();
 }
 function fusiona(){ const m={}; carrito.forEach(i=>{m[i.sku]=(m[i.sku]||0)+i.cant;}); carrito=Object.entries(m).map(([sku,cant])=>({sku,cant})); }
 
-/* ============ CHECKOUT ============ */
+/* ============ PAGO ============ */
 let pagoSel = DB.load("pago","transferencia");
+const NOMBRE_ENTREGA = { pickup:"Recoger en persona", local:"Entrega local en Mexicali", nacional:"Envío a todo México" };
+function campo(id,etq,valor,extra){ return `<div class="field"><label for="${id}">${etq}</label><input id="${id}" value="${esc(valor||"")}" ${extra||""}></div>`; }
 function viewCheckout(){
+  if(!carrito.length) return viewCarrito();
   ev("begin_checkout",{items:evItems(carrito),valor:totales().total});
-  const T=totales(); const C=CFG();
-  const pideCP = entrega==="nacional";
-  return `<div class="back-row"><button onclick="go('carrito')">← Carrito</button></div>
-  <h2 class="titulo serif">Checkout</h2>
-  <div class="panel">
-    <h4>Tus datos</h4>
-    <div class="field"><label>Nombre completo</label><input id="ckNombre" value="${perfil.nombre||""}" placeholder="Tu nombre completo"></div>
-    <div class="field"><label>Tu WhatsApp</label><input id="ckWhats" inputmode="tel" value="${perfil.whats||""}" placeholder="686 000 0000"></div>
-    <div class="field"><label>Correo electrónico</label><input id="ckCorreo" type="email" inputmode="email" autocomplete="email" value="${perfil.correo||""}" placeholder="tucorreo@ejemplo.com"></div>
-  </div>
-  <div class="panel">
-    <h4>Entrega · ${entrega==="pickup"?"Recoger personalmente":entrega==="local"?"Entrega local en Mexicali":"Envío nacional"}</h4>
-    ${entrega==="pickup"
-      ? `<p style="font-size:13px;color:var(--gris)">Recoges en: <b style="color:var(--tinta)">${C.pickupAddress}</b>${C.schedule?`<br>Horario: ${C.schedule}`:""}</p>`
-      : `<div class="field"><label>Dirección (calle y número)</label><input id="ckDir" value="${perfil.dir||""}" placeholder="Calle y número"></div>
-         <div class="field"><label>Colonia</label><input id="ckCol" value="${perfil.col||""}" placeholder="Colonia"></div>
-         ${pideCP?`<div class="field"><label>Código postal</label><input id="ckCP" inputmode="numeric" value="${perfil.cp||""}" placeholder="21000"></div>
-         <div class="field"><label>Ciudad y estado</label><input id="ckCiudad" value="${perfil.ciudad||""}" placeholder="Ciudad, Estado"></div>`:""}
-         <div class="field"><label>Referencias</label><input id="ckRef" value="${perfil.ref||""}" placeholder="Entre calles, color de casa…"></div>`}
-    <button style="font-size:12px;color:var(--oro);font-weight:600;margin-top:2px" onclick="go('carrito')">Cambiar método de entrega</button>
-  </div>
-  <div class="panel">
-    <h4>Método de pago</h4>
-    <div class="entrega" style="grid-template-columns:1fr">
-      <button class="ent-opt ${pagoSel==='transferencia'?'on':''}" onclick="pagoSel='transferencia';DB.save('pago',pagoSel);render()">
-        <b>Transferencia</b><small>Te enviamos los datos al confirmar</small></button>
-      <button class="ent-opt ${pagoSel==='efectivo'?'on':''}" onclick="pagoSel='efectivo';DB.save('pago',pagoSel);render()">
-        <b>Efectivo al recoger</b><small>Pagas al recibir tu pedido</small></button>
-      ${C.mercadoPagoEnabled
-        ? `<button class="ent-opt ${pagoSel==='tarjeta'?'on':''}" onclick="pagoSel='tarjeta';DB.save('pago',pagoSel);render()">
-             <b>Pago con tarjeta</b><small>Vía Mercado Pago</small></button>`
-        : `<button class="ent-opt" style="opacity:.45;pointer-events:none" aria-disabled="true">
-             <b>Pago con tarjeta</b><small>Próximamente</small></button>`}
+  const T=totales(), C=CFG();
+  if(pagoSel==="tarjeta"&&!C.mercadoPagoEnabled) pagoSel="transferencia";
+  if(pagoSel==="efectivo"&&entrega==="nacional") pagoSel="transferencia";
+  const conTarjeta=pagoSel==="tarjeta";
+  return `<div class="back-row"><button onclick="go('carrito')"><span aria-hidden="true">←</span> Tu bolsa</button></div>
+  <h1 class="titulo" tabindex="-1">Pago</h1>
+  <div class="dos-col">
+    <form onsubmit="event.preventDefault();confirmarPedido()" id="formPago" novalidate>
+      <div class="panel">
+        <h4>Tus datos</h4>
+        ${campo("ckNombre","Nombre completo",perfil.nombre,'autocomplete="name" required')}
+        ${campo("ckWhats","WhatsApp",perfil.whats,'type="tel" inputmode="tel" autocomplete="tel" required')}
+        ${campo("ckCorreo","Correo electrónico (opcional)",perfil.correo,'type="email" inputmode="email" autocomplete="email"')}
+      </div>
+      <div class="panel">
+        <h4>${NOMBRE_ENTREGA[entrega]}</h4>
+        ${entrega==="pickup"
+          ? `<p class="nota">Recoges en ${esc(C.pickupAddress)}.</p>`
+          : campo("ckDir","Calle y número",perfil.dir,'autocomplete="address-line1" required')
+            + campo("ckCol","Colonia",perfil.col,'autocomplete="address-line2" required')
+            + (entrega==="nacional" ? campo("ckCP","Código postal",perfil.cp,'inputmode="numeric" autocomplete="postal-code" maxlength="5" required')
+                + campo("ckCiudad","Ciudad y estado",perfil.ciudad,'autocomplete="address-level2" required') : "")
+            + campo("ckRef","Referencias para encontrar el domicilio (opcional)",perfil.ref,'autocomplete="off"')}
+        <button type="button" class="enlace" onclick="go('carrito')">Cambiar la forma de entrega</button>
+      </div>
+      <div class="panel">
+        <h4>Forma de pago</h4>
+        <div class="entrega">
+          ${C.mercadoPagoEnabled
+            ? `<button type="button" class="ent-opt" aria-pressed="${conTarjeta}" onclick="pagoSel='tarjeta';DB.save('pago',pagoSel);render()">
+                 <b>Tarjeta de crédito o débito</b><small>Pagas en Mercado Pago. OMA no recibe los datos de tu tarjeta.</small></button>`
+            : ""}
+          <button type="button" class="ent-opt" aria-pressed="${pagoSel==='transferencia'}" onclick="pagoSel='transferencia';DB.save('pago',pagoSel);render()">
+            <b>Transferencia</b><small>Te mostramos los datos al confirmar el pedido.</small></button>
+          ${entrega!=="nacional"?`<button type="button" class="ent-opt" aria-pressed="${pagoSel==='efectivo'}" onclick="pagoSel='efectivo';DB.save('pago',pagoSel);render()">
+            <b>Efectivo al recibir</b><small>Pagas cuando te entregamos el pedido.</small></button>`:""}
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Algo que debamos saber (opcional)</h4>
+        <div class="field" style="margin-bottom:0"><label class="solo-lector" for="ckNotas">Notas del pedido</label>
+          <input id="ckNotas" autocomplete="off"></div>
+      </div>
+    </form>
+    <div class="lateral" style="padding-top:0">
+      <div class="panel">
+        <h4>Tu pedido</h4>
+        ${carrito.map(i=>{const {m,talla}=skuInfo(i.sku);return `<div class="tot-row"><span>${i.cant} × ${esc(m.nombre)} ${esc(m.color.toLowerCase())}, ${talla}</span><span>${peso(m.precio*i.cant)}</span></div>`;}).join("")}
+        ${T.desc>0?`<div class="tot-row"><span>Descuento ${esc(T.etiqueta)}</span><span class="verde">−${peso(T.desc)}</span></div>`:""}
+        <div class="tot-row"><span>Entrega</span><span>${T.envio===0?'Gratis':peso(T.envio)}</span></div>
+        <div class="tot-row big"><span>Total</span><span>${peso(T.total)}</span></div>
+      </div>
+      <p class="aviso-legal">${conTarjeta?"Al confirmar vas a Mercado Pago para pagar. El total se recalcula en nuestro servidor."
+        :"Al confirmar se abre WhatsApp con tu pedido escrito: solo falta enviarlo para que OMA lo aparte."}
+        Aceptas los <a href="/terminos/">términos</a> y el <a href="/privacidad/">aviso de privacidad</a>. Consulta <a href="/cambios/">cambios y devoluciones</a>.</p>
+      <div class="pie-pago"><button class="btn btn-ancho" id="btnConfirmar" onclick="confirmarPedido()">${conTarjeta?"Pagar "+peso(T.total)+" con tarjeta":"Enviar pedido por WhatsApp"}</button></div>
     </div>
-    ${pagoSel==="transferencia"?`<p style="font-size:12.5px;color:var(--gris);margin-top:10px">Al confirmar tu pedido te mostramos los datos para transferir y te los enviamos por WhatsApp.</p>`:""}
-  </div>
-  <div class="panel">
-    <h4>Notas adicionales</h4>
-    <div class="field" style="margin-bottom:0"><input id="ckNotas" placeholder="Opcional: instrucciones, horario, etc."></div>
-  </div>
-  <div class="panel">
-    <h4>Resumen</h4>
-    ${carrito.map(i=>{const {m,talla}=skuInfo(i.sku);return `<div class="tot-row"><span>${i.cant}× ${m.nombre} ${m.color} (${talla})</span><span>${peso(m.precio*i.cant)}</span></div>`;}).join("")}
-    ${T.desc>0?`<div class="tot-row"><span>Descuento ${T.etiqueta}</span><span class="verde">−${peso(T.desc)}</span></div>`:""}
-    <div class="tot-row"><span>Entrega</span><span>${T.envio===0?'Gratis':peso(T.envio)}</span></div>
-    <div class="tot-row big"><span>Total</span><span>${peso(T.total)}</span></div>
-  </div>
-  <p style="padding:0 22px;font-size:12px;color:var(--gris)">${pagoSel==="tarjeta"?"Al confirmar te llevamos a Mercado Pago para pagar con tarjeta de forma segura.":"Al confirmar se abre WhatsApp con tu pedido armado — solo presiona enviar para que ROMA lo confirme."}</p>
-  <p class="aviso-legal">Al confirmar aceptas los <a href="/terminos/">términos y condiciones</a> y el <a href="/privacidad/">aviso de privacidad</a>. Consulta <a href="/cambios/">cambios y devoluciones</a>.</p>
-  <div style="margin:14px 20px"><button class="btn-cart" style="width:100%" onclick="confirmarPedido()">${pagoSel==="tarjeta"?"Pagar con tarjeta · "+peso(T.total):"Enviar pedido por WhatsApp"}</button></div>`;
+  </div>`;
 }
 function nuevoFolio(){
   const d=new Date();
   const ymd=d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
-  return "ROMA-"+ymd+"-"+String(1000+Math.floor(Math.random()*9000));
+  return "OMA-"+ymd+"-"+String(1000+Math.floor(Math.random()*9000));
 }
 function confirmarPedido(){
-  const C=CFG();
-  const nombre=$("ckNombre").value.trim(), whats=$("ckWhats").value.trim();
-  const correo=$("ckCorreo")?$("ckCorreo").value.trim():"";
-  const notas=$("ckNotas")?$("ckNotas").value.trim():"";
+  const C=CFG(), val=id=>{const e=$(id);return e&&e.value?String(e.value).trim():"";};
+  const nombre=val("ckNombre"), whats=val("ckWhats"), correo=val("ckCorreo"), notas=val("ckNotas");
   let dir="", col="", cp="", ciudad="", ref="";
-  if(entrega!=="pickup"){
-    dir=$("ckDir").value.trim(); col=$("ckCol").value.trim(); ref=$("ckRef")?$("ckRef").value.trim():"";
-    if(entrega==="nacional"){ cp=$("ckCP").value.trim(); ciudad=$("ckCiudad").value.trim(); }
-  }
+  if(entrega!=="pickup"){ dir=val("ckDir"); col=val("ckCol"); ref=val("ckRef"); if(entrega==="nacional"){ cp=val("ckCP"); ciudad=val("ckCiudad"); } }
+  if(!carrito.length){ go("carrito"); return; }
   if(!nombre){ toast("Escribe tu nombre completo"); return; }
   if(!whats){ toast("Escribe tu WhatsApp"); return; }
   if(correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)){ toast("Revisa tu correo electrónico"); return; }
-  if(entrega!=="pickup"&&(!dir||!col)){ toast("Falta la dirección o colonia"); return; }
-  if(entrega==="nacional"&&(!cp||!ciudad)){ toast("Falta código postal o ciudad"); return; }
-  perfil={...perfil,nombre,whats,correo,dir:entrega!=="pickup"?dir:perfil.dir,col,cp,ciudad,ref}; DB.save("perfil",perfil);
-  const T=totales();
-  const folio=nuevoFolio();
-  const entTxt = entrega==="pickup" ? "Recoger personalmente ("+C.pickupAddress+")"
-    : entrega==="local" ? "Entrega local en Mexicali" : "Envío nacional";
-  const pagoTxt = pagoSel==="transferencia"?"Transferencia":pagoSel==="tarjeta"?"Tarjeta (Mercado Pago)":"Efectivo al recoger";
+  if(entrega!=="pickup"&&(!dir||!col)){ toast("Falta la calle o la colonia"); return; }
+  if(entrega==="nacional"&&(!cp||!ciudad)){ toast("Falta el código postal o la ciudad"); return; }
+  perfil=Object.assign({},perfil,{nombre,whats,correo,dir:entrega!=="pickup"?dir:perfil.dir,col:col||perfil.col,cp:cp||perfil.cp,ciudad:ciudad||perfil.ciudad,ref}); DB.save("perfil",perfil);
+  const T=totales(), folio=nuevoFolio();
+  const entTxt = entrega==="pickup" ? "Recoger en persona ("+C.pickupAddress+")" : NOMBRE_ENTREGA[entrega];
+  const pagoTxt = pagoSel==="transferencia"?"Transferencia":pagoSel==="tarjeta"?"Tarjeta (Mercado Pago)":"Efectivo al recibir";
   const L=[];
-  L.push("🛍 *PEDIDO "+folio+"*","");
+  L.push("*PEDIDO "+folio+"*","");
   L.push("*Cliente:* "+nombre);
   L.push("*WhatsApp:* "+whats);
   if(correo) L.push("*Correo:* "+correo);
-  L.push("");
-  L.push("*Productos:*");
+  L.push("","*Productos:*");
   carrito.forEach(i=>{const {m,talla}=skuInfo(i.sku);
     L.push("- "+i.cant+"x "+m.nombre+" | "+m.color+" | Talla "+talla+" | "+peso(m.precio)+" c/u = "+peso(m.precio*i.cant));});
-  L.push("");
-  L.push("Subtotal: "+peso(T.sub));
+  L.push("","Subtotal: "+peso(T.sub));
   if(T.desc>0) L.push("Descuento "+T.etiqueta+": -"+peso(T.desc));
   L.push("Entrega ("+entTxt+"): "+(T.envio===0?"Gratis":peso(T.envio)));
-  L.push("*TOTAL: "+peso(T.total)+"*","");
-  L.push("*Pago:* "+pagoTxt);
+  L.push("*TOTAL: "+peso(T.total)+"*","","*Pago:* "+pagoTxt);
   if(entrega!=="pickup"){
-    L.push("*Direccion:* "+dir+", Col. "+col+(cp?", CP "+cp:"")+(ciudad?", "+ciudad:""));
+    L.push("*Dirección:* "+dir+", Col. "+col+(cp?", CP "+cp:"")+(ciudad?", "+ciudad:""));
     if(ref) L.push("*Referencias:* "+ref);
   }
   if(notas) L.push("*Notas:* "+notas);
-  const texto=L.join("\n");
-  const ganados=Math.floor(T.total/10);
+  const texto=L.join("\n"), ganados=Math.floor(T.total/10);
   ordenes.unshift({folio,fecha:new Date().toISOString().slice(0,10),total:T.total,puntos:ganados,
     items:carrito.map(i=>{const {m,talla}=skuInfo(i.sku);return {n:m.nombre,c:m.color,t:talla,q:i.cant,sku:i.sku};}),
     entrega,pago:pagoSel,estado:pagoSel==="tarjeta"?"Pendiente de pago":"Pendiente de enviar",texto});
   DB.save("ordenes",ordenes);
-  /* Con tarjeta todavia no sabemos si el pago se aprueba: conservamos el carrito
-     y los puntos hasta que Mercado Pago responda (ver cierraPedido). Asi, si la
-     tarjeta se rechaza, la clienta vuelve con su seleccion intacta. */
   ev("add_payment_info",{items:evItems(carrito),valor:T.total,extra:{payment_type:pagoSel}});
-  if(pagoSel==="tarjeta"){ pagarConMP(folio,T.total,carrito.map(i=>({sku:i.sku,cant:i.cant})),entrega); return; }
+  /* Con tarjeta todavía no se sabe si el pago pasa: la bolsa y los puntos
+     esperan a la respuesta de Mercado Pago (cierraPedido). Si la tarjeta
+     rebota, la clienta vuelve con su bolsa intacta. */
+  if(pagoSel==="tarjeta"){ pagarConMP(folio,carrito.map(i=>({sku:i.sku,cant:i.cant})),entrega); return; }
   cierraPedido(folio);
   navegaA("https://wa.me/"+C.whatsappNumber+"?text="+encodeURIComponent(texto));
   go("confirmacion",{folio,ganados});
 }
-/* Cierra el pedido: otorga los puntos y vacia el carrito. Solo se llama cuando
-   el pedido quedo en firme (WhatsApp/transferencia, o tarjeta aprobada). */
+/* Cierra el pedido: registra la compra, da los puntos y vacía la bolsa.
+   Solo cuando quedó en firme (WhatsApp o tarjeta aprobada). */
 function cierraPedido(folio){
   const o=ordenes.find(x=>x.folio===folio);
-  /* purchase solo aqui: pedido en firme o tarjeta aprobada. */
   if(o && !o.eventoCompra){
     ev("purchase",{items:evItems((o.items||[]).filter(x=>x.sku).map(x=>({sku:x.sku,cant:x.q}))),valor:o.total,extra:{transaction_id:o.folio}});
     if(window.ROMA_CONVERSION_COMPRA) window.ROMA_CONVERSION_COMPRA(o.folio,o.total);
     o.eventoCompra=true;
   }
-  if(o && !o.puntosAplicados){ puntos+=(o.puntos||0); o.puntosAplicados=true;
-    DB.save("puntos",puntos); DB.save("ordenes",ordenes); }
+  if(o && !o.puntosAplicados){ puntos+=(o.puntos||0); o.puntosAplicados=true; DB.save("puntos",puntos); }
+  DB.save("ordenes",ordenes);
   carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null);
 }
-async function pagarConMP(folio,total,items,entregaSel){
+async function pagarConMP(folio,items,entregaSel){
+  const b=$("btnConfirmar"); if(b){ b.disabled=true; b.textContent="Abriendo Mercado Pago…"; }
   try{
     const r=await fetch("/.netlify/functions/create-preference",{
       method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({folio, items, entrega:entregaSel, codigo:codigoAplicado,
-        nivelPct: CFG().puntosEnabled===false?0:nivelPctActual()})
+      body:JSON.stringify({folio, items, entrega:entregaSel, codigo:codigoAplicado, nivelPct:nivelPctActual()})
     });
     const data=await r.json();
     if(!r.ok||!data.init_point) throw new Error(data.error||"No se pudo iniciar el pago");
     navegaA(data.init_point);
   }catch(e){
-    toast(e.message||"No se pudo iniciar el pago con tarjeta. Intenta de nuevo o elige otro método.");
+    toast(e.message||"No se pudo abrir el pago con tarjeta. Intenta de nuevo o elige otra forma de pago.");
     go("checkout");
   }
 }
-/* % de descuento por nivel; el servidor lo recorta al maximo real de la tienda */
-function nivelPctActual(){
-  const C=CFG(), niv=nivelDe(puntos)[0];
-  return niv==="Élite"?(C.eliteDiscountPct||0) : niv==="Oro"?(C.oroDiscountPct||0) : 0;
-}
-/* Entrada desde las paginas indexables: /productos/<slug>/ enlaza a
-   la tienda con ?producto=<slug> y abre esa prenda directamente. */
+/* Entrada desde las páginas indexables: /productos/<slug>/ enlaza a la
+   tienda con ?producto=<slug> y abre esa prenda directamente. */
 function procesaEnlaceEntrada(){
   try{
     const qs=new URLSearchParams(location.search);
@@ -926,148 +1058,145 @@ function procesaRetornoMP(){
   if(!mp||!folio) return;
   const o=ordenes.find(x=>x.folio===folio);
   if(o){ o.estado = mp==="approved"?"Pagado con tarjeta":mp==="pending"?"Pago pendiente":"Pago rechazado"; DB.save("ordenes",ordenes); }
-  /* Aprobado: se otorgan los puntos y se vacia el carrito.
-     Pendiente: el pago sigue en curso, vaciamos el carrito pero sin dar puntos.
-     Rechazado: no se toca nada — el carrito sigue intacto para reintentar. */
+  /* Aprobado: puntos y bolsa vacía. Pendiente: el pago sigue en curso, se
+     vacía la bolsa sin dar puntos. Rechazado: nada cambia, para reintentar. */
   if(mp==="approved") cierraPedido(folio);
   else if(mp==="pending"){ carrito=[]; codigoAplicado=null; DB.save("carrito",carrito); DB.save("codigo",null); }
   vista="pagoMP"; vistaParam={folio,estado:mp};
-  history.replaceState(null,"",window.location.pathname);
+  limpiaUrl();
 }
 function viewPagoMP(){
   const p=vistaParam||{};
   const ok=p.estado==="approved", pend=p.estado==="pending";
   return `<div class="conf">
-    <div class="sello-ok">${ok?"✓":pend?"…":"✕"}</div>
-    <h2 class="serif">Pedido ${p.folio||""}</h2>
-    <p>${ok?'<b style="color:var(--tinta)">¡Pago con tarjeta aprobado!</b> Avísale a ROMA por WhatsApp para que prepare tu pedido.'
-        :pend?"Tu pago está pendiente de confirmación. Te avisaremos apenas se confirme."
-        :'El pago no se completó. <b style="color:var(--tinta)">Tu carrito sigue intacto</b> — puedes intentar con otra tarjeta o elegir otro método de pago.'}</p>
-    <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:22px auto 0">
-      ${ok||pend?`<button class="btn-cart" onclick="navegaA(waDe('${p.folio}'))">Avisar por WhatsApp</button>`
-        :`<button class="btn-cart" onclick="go('carrito')">Volver al carrito</button>`}
-      <button class="btn-linea" onclick="go('home')">Volver al inicio</button>
+    <div class="sello-ok" aria-hidden="true">${ok?"✓":pend?"…":"×"}</div>
+    <h1 tabindex="-1">${ok?"Pago recibido":pend?"Pago en revisión":"El pago no pasó"}</h1>
+    <p>Pedido ${esc(p.folio||"")}</p>
+    <p>${ok?"Mercado Pago nos avisó que tu pago fue aprobado. Escríbenos por WhatsApp para coordinar la entrega."
+        :pend?"Mercado Pago todavía está confirmando tu pago. En cuanto se apruebe preparamos tu pedido."
+        :"Tu bolsa sigue intacta. Puedes intentar con otra tarjeta o elegir otra forma de pago."}</p>
+    <div class="acciones">
+      ${ok||pend?`<button class="btn" onclick="navegaA(waDe('${esc(p.folio)}'))">Escribir por WhatsApp</button>`
+        :`<button class="btn" onclick="go('carrito')">Volver a tu bolsa</button>`}
+      <button class="btn btn-claro" onclick="go('home')">Ir al inicio</button>
     </div>
   </div>`;
 }
-/* Datos bancarios: solo aparecen aqui, con el pedido ya generado (regla 8). */
+/* Datos bancarios: solo aparecen con el pedido ya generado. */
 function datosTransferencia(folio){
   const o=ordenes.find(x=>x.folio===folio); if(!o||o.pago!=="transferencia") return "";
   const C=CFG(); if(!C.clabe) return "";
-  const fila=(et,val)=>val?("<p style=\"font-size:13px;margin:2px 0\">"+et+": <b style=\"color:var(--tinta)\">"+val+"</b></p>"):"";
-  return "<div class=\"panel\" style=\"text-align:left;max-width:320px;margin:18px auto 0\">"+
-    "<h4>Para completar tu pago</h4>"+
-    "<p style=\"font-size:13px;color:var(--gris);margin:0 0 6px\">Transfiere "+peso(o.total)+" y mándanos el comprobante por WhatsApp.</p>"+
-    fila("Banco",C.bankName)+fila("A nombre de",C.accountHolder)+fila("CLABE",C.clabe)+
-    "<button class=\"mini-btn sec2\" style=\"margin-top:8px\" onclick=\"copiarClabe()\">⧉ Copiar CLABE</button>"+
-  "</div>";
+  const fila=(et,v)=>v?`<p>${et}: <b>${esc(v)}</b></p>`:"";
+  return `<div class="panel"><h4>Para completar tu pago</h4>
+    <p>Transfiere ${peso(o.total)} y mándanos el comprobante por WhatsApp.</p>
+    ${fila("Banco",C.bankName)}${fila("A nombre de",C.accountHolder)}${fila("CLABE o tarjeta",C.clabe)}
+    <button class="mini-btn sec2" style="margin-top:10px" onclick="copiarClabe()">Copiar número</button></div>`;
 }
 async function copiarClabe(){
-  try{ await navigator.clipboard.writeText(CFG().clabe||""); toast("CLABE copiada"); }
+  try{ await navigator.clipboard.writeText(CFG().clabe||""); toast("Número copiado"); }
   catch(e){ toast("No se pudo copiar"); }
 }
 function waDe(folio){
-  const o=ordenes.find(x=>x.folio===folio); if(!o) return "#";
+  const o=ordenes.find(x=>x.folio===folio); if(!o) return "https://wa.me/"+CFG().whatsappNumber;
   return "https://wa.me/"+CFG().whatsappNumber+"?text="+encodeURIComponent(o.texto||"");
 }
 async function copiarPedido(folio){
   const o=ordenes.find(x=>x.folio===folio); if(!o) return;
   const txt=(o.texto||"").replace(/\*/g,"");
-  try{ await navigator.clipboard.writeText(txt); toast("Pedido copiado — pégalo en WhatsApp"); }
+  try{ await navigator.clipboard.writeText(txt); toast("Pedido copiado: pégalo en WhatsApp"); }
   catch(e){ prompt("Copia tu pedido:",txt); }
 }
 function viewConfirmacion(){
   const p=vistaParam||{folio:"",ganados:0};
   return `<div class="conf">
-    <div class="sello-ok">✓</div>
-    <h2 class="serif">Pedido ${p.folio}</h2>
-    <p><b style="color:var(--tinta)">Tu pedido está preparado.</b> Presiona enviar dentro de WhatsApp para que ROMA pueda confirmarlo.</p>
-    <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:22px auto 0">
-      <button class="btn-cart" onclick="navegaA(waDe('${p.folio}'))">Abrir WhatsApp con mi pedido</button>
-      <button class="btn-linea" onclick="copiarPedido('${p.folio}')">⧉ Copiar pedido</button>
+    <div class="sello-ok" aria-hidden="true">✓</div>
+    <h1 tabindex="-1">Tu pedido está escrito</h1>
+    <p>Pedido ${esc(p.folio)}</p>
+    <p>Falta un paso: envíalo en WhatsApp para que OMA lo aparte y te confirme la entrega.</p>
+    <div class="acciones">
+      <button class="btn" onclick="navegaA(waDe('${esc(p.folio)}'))">Abrir WhatsApp con mi pedido</button>
+      <button class="btn btn-claro" onclick="copiarPedido('${esc(p.folio)}')">Copiar el pedido</button>
     </div>
     ${datosTransferencia(p.folio)}
-    <p style="margin-top:12px;color:var(--oro);font-weight:700">+${p.ganados} puntos ROMA ✦</p>
-    <button class="btn-oro" style="margin-top:20px" onclick="go('home')">Volver al inicio</button>
+    ${CFG().puntosEnabled!==false&&p.ganados?`<p class="nota">Sumaste ${p.ganados} puntos OMA.</p>`:""}
+    <button class="enlace" style="margin-top:12px" onclick="go('home')">Ir al inicio</button>
   </div>`;
 }
 
-/* ============ PERFIL ============ */
+/* ============ CUENTA ============ */
 function nivelDe(p){ return p>=1500?["Élite",1500,3000]:p>=500?["Oro",500,1500]:["Bronce",0,500]; }
 function viewPerfil(){
   const C=CFG();
   const [niv,base,tope]=nivelDe(puntos);
   const pct=Math.min(100,Math.round((puntos-base)/(tope-base)*100));
-  const beneficioTxt = niv==="Élite" ? `Tu beneficio: ${C.eliteDiscountPct||0}% de descuento automático en cada compra.`
-    : niv==="Oro" ? `Tu beneficio: ${C.oroDiscountPct||0}% de descuento automático en cada compra.`
-    : `Al llegar a Oro (500 pts) desbloqueas ${C.oroDiscountPct||0}% de descuento automático; en Élite (1,500 pts), ${C.eliteDiscountPct||0}%.`;
-  return `<h2 class="titulo serif">${perfil.nombre?("Hola, "+perfil.nombre.split(" ")[0]):"Tu perfil"}</h2>
+  const beneficio = niv==="Élite" ? `Tienes ${C.eliteDiscountPct||0} % de descuento en cada compra.`
+    : niv==="Oro" ? `Tienes ${C.oroDiscountPct||0} % de descuento en cada compra.`
+    : `Con 500 puntos llegas a Oro y tienes ${C.oroDiscountPct||0} % de descuento en cada compra; con 1,500, ${C.eliteDiscountPct||0} %.`;
+  return `<h1 class="titulo" tabindex="-1">${perfil.nombre?("Hola, "+esc(perfil.nombre.split(" ")[0])):"Tu cuenta"}</h1>
   ${C.puntosEnabled===false?"":`<div class="nivel-card">
-    <div class="eyebrow">Nivel ${niv}</div>
-    <h3 class="serif">${puntos} puntos ✦</h3>
-    <p>${beneficioTxt}</p>
-    <p style="margin-top:4px">${tope-puntos>0?`${tope-puntos} puntos para el siguiente nivel — 1 punto por cada $10 de compra.`:"Nivel máximo."}</p>
+    <p>Nivel ${niv}</p>
+    <h3>${puntos} puntos</h3>
+    <p>${beneficio}</p>
+    <p>${tope-puntos>0&&niv!=="Élite"?`Te faltan ${tope-puntos} para el siguiente nivel. Ganas 1 punto por cada $10 de compra.`:"Ganas 1 punto por cada $10 de compra."}</p>
     <div class="nivel-bar"><div style="width:${pct}%"></div></div>
   </div>`}
-  <div class="panel" style="margin-top:4px">
+  <div class="panel">
     <h4>Tus datos</h4>
-    <div class="field"><label>Nombre</label><input id="pfNombre" value="${perfil.nombre||""}" placeholder="Tu nombre"></div>
-    <div class="field"><label>Teléfono o correo</label><input id="pfWhats" value="${perfil.whats||""}" placeholder="686 000 0000 o tu@correo.com"></div>
-    <button class="btn-linea" style="width:100%" onclick="perfil.nombre=$('pfNombre').value;perfil.whats=$('pfWhats').value;DB.save('perfil',perfil);toast('Datos guardados');render()">Guardar cambios</button>
+    ${campo("pfNombre","Nombre",perfil.nombre,'autocomplete="name"')}
+    ${campo("pfWhats","WhatsApp",perfil.whats,'type="tel" inputmode="tel" autocomplete="tel"')}
+    <button class="btn btn-claro btn-ancho" onclick="perfil.nombre=$('pfNombre').value.trim();perfil.whats=$('pfWhats').value.trim();DB.save('perfil',perfil);toast('Datos guardados');render()">Guardar datos</button>
   </div>
-  <button class="perfil-item" onclick="go('pedidos')"><span class="ic">▤</span> Mis pedidos <small>${ordenes.length}</small></button>
-  <button class="perfil-item" onclick="go('looks')"><span class="ic">♡</span> Mis looks guardados <small>${looks.length}</small></button>
-  <button class="perfil-item" onclick="verPromos()"><span class="ic">🏷</span> Mis promociones disponibles</button>
-  ${ADMIN_VISIBLE?`<button class="perfil-item" onclick="go('admin')"><span class="ic">🔒</span> Administrador ROMA</button>`:""}
-  <button class="perfil-item" onclick="toggleTema()"><span class="ic">◐</span> Modo ${tema==="claro"?"oscuro":"claro"}</button>`;
+  <button class="perfil-item" onclick="go('pedidos')"><span>Tus pedidos</span><small>${ordenes.length}</small></button>
+  <button class="perfil-item" onclick="go('looks')"><span>Tus looks</span><small>${looks.length}</small></button>
+  <button class="perfil-item" onclick="verPromos()"><span>Códigos de descuento</span><small aria-hidden="true">+</small></button>
+  <button class="perfil-item" onclick="toggleTema()"><span>Modo ${tema==="claro"?"oscuro":"claro"}</span><small aria-hidden="true">${tema==="claro"?"☾":"☀"}</small></button>
+  ${ADMIN_VISIBLE?`<button class="perfil-item" onclick="go('admin')"><span>Administrador</span><small aria-hidden="true">→</small></button>`:""}
+  ${pieTienda()}`;
 }
 function verPromos(){
   const hoy=new Date().toISOString().slice(0,10);
-  const html=`<div class="hoja-bg" onclick="if(event.target===this)this.remove()"><div class="hoja">
-    <div class="asa"></div><h3 class="serif" style="font-size:24px;margin-bottom:12px">Promociones disponibles</h3>
+  const html=`<div class="hoja-bg" onclick="if(event.target===this)this.remove()"><div class="hoja" role="dialog" aria-label="Códigos de descuento">
+    <h3>Códigos de descuento</h3>
     ${Object.entries(CODIGOS).map(([k,c])=>{
-      const exp=c.vence&&c.vence<hoy;
+      const exp=c.vence&&c.vence<hoy, auto=k==="OUTFIT";
       return `<div class="cupon" style="margin-bottom:10px;${exp?'opacity:.45':''}">
-        <div><b>${k}</b><small>${c.desc}${c.vence?` · vence ${c.vence}`:""}${exp?" · EXPIRADO":""}</small></div>
-        ${exp?"":`<button class="mini-btn" onclick="codigoAplicado='${k}';DB.save('codigo','${k}');this.closest('.hoja-bg').remove();toast('${k} se aplicará en tu carrito')">Usar</button>`}
+        <div><b>${auto?"Outfit completo":esc(k)}</b><small>${esc(c.desc||"")}${c.vence?`. Vence el ${esc(c.vence)}`:""}${exp?". Vencido":""}</small></div>
+        ${exp||auto?"":`<button class="mini-btn" onclick="codigoAplicado='${esc(k)}';DB.save('codigo','${esc(k)}');this.closest('.hoja-bg').remove();toast('Código listo para tu bolsa')">Usar</button>`}
       </div>`;}).join("")}
+    <button class="btn btn-claro btn-ancho" style="margin-top:8px" onclick="this.closest('.hoja-bg').remove()">Cerrar</button>
   </div></div>`;
   document.body.insertAdjacentHTML("beforeend",html);
 }
 function viewPedidos(){
-  return `<div class="back-row"><button onclick="go('perfil')">← Perfil</button></div>
-  <h2 class="titulo serif">Mis pedidos</h2>
+  return `<div class="back-row"><button onclick="go('perfil')"><span aria-hidden="true">←</span> Tu cuenta</button></div>
+  <h1 class="titulo" tabindex="-1">Tus pedidos</h1>
   ${ordenes.length?ordenes.map(o=>`<div class="orden">
-    <div class="o-head"><b>${o.folio}</b><span>${o.fecha}</span></div>
-    <p>${o.items.map(i=>`${i.q}× ${i.n} ${i.c} (${i.t})`).join(" · ")}</p>
-    <div class="o-head" style="margin-top:6px"><span style="color:var(--oro);font-weight:700">+${o.puntos} pts ✦</span><b>${peso(o.total)}</b></div>
-    ${o.texto?`<div style="display:flex;gap:8px;margin-top:9px">
-      <button class="mini-btn sec2" onclick="navegaA(waDe('${o.folio}'))">✉ Reenviar por WhatsApp</button>
-      <button class="mini-btn sec2" onclick="copiarPedido('${o.folio}')">⧉ Copiar</button></div>`:""}
+    <div class="o-head"><b>${esc(o.folio)}</b><span>${esc(o.fecha)}</span></div>
+    <p>${o.items.map(i=>`${i.q} × ${esc(i.n)} ${esc(String(i.c).toLowerCase())}, ${esc(i.t)}`).join("; ")}</p>
+    <div class="o-head" style="margin-top:8px"><span>${esc(o.estado||"")}</span><b>${peso(o.total)}</b></div>
+    ${o.texto?`<div class="acciones">
+      <button class="mini-btn sec2" onclick="navegaA(waDe('${esc(o.folio)}'))">Reenviar por WhatsApp</button>
+      <button class="mini-btn sec2" onclick="copiarPedido('${esc(o.folio)}')">Copiar</button></div>`:""}
   </div>`).join("")
-  :`<div class="vacio-msg"><div class="big">▤</div><h3 class="serif">Sin pedidos aún</h3><p>Tu primer look te espera.</p></div>`}`;
+  :`<div class="vacio-msg"><h2>Todavía no hay pedidos</h2><p>Cuando hagas uno lo verás aquí.</p><button class="btn" onclick="go('tienda')">Ver la colección</button></div>`}`;
 }
 
 function navegaA(url){ try{ window.location.href=url; }catch(e){} }
 
-/* ---------- instalación en iOS (Safari no ofrece prompt nativo) ---------- */
+/* ---------- instalación en iOS (Safari no ofrece el aviso nativo) ---------- */
 function esIOSInstalable(){
   const ua=navigator.userAgent||"";
   const iOS=/iPad|iPhone|iPod/.test(ua) && !window.MSStream;
   const safari=/Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
-  const standalone = window.navigator.standalone===true || window.matchMedia("(display-mode: standalone)").matches;
+  const standalone = window.navigator.standalone===true || (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);
   return iOS && safari && !standalone;
 }
 function pintaBannerInstalar(){
-  if($("bannerInstalar")) return;
-  if(!esIOSInstalable()) return;
+  if($("bannerInstalar")||!esIOSInstalable()) return;
   if(Date.now() < DB.load("instalarOcultoHasta",0)) return;
   document.body.insertAdjacentHTML("beforeend",
-    `<div id="bannerInstalar" style="position:fixed;left:12px;right:12px;bottom:78px;z-index:60;background:var(--tinta);color:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 22px rgba(0,0,0,.25)">
-      <span style="font-size:20px">📲</span>
-      <div style="flex:1;font-size:12.5px;line-height:1.35">Instala ROMA: toca <b>Compartir</b> ⬆ y luego <b>"Agregar a pantalla de inicio"</b></div>
-      <button onclick="cerrarBannerInstalar()" style="background:none;border:none;color:#fff;font-size:18px;line-height:1;padding:4px">✕</button>
-    </div>`);
+    `<div id="bannerInstalar"><div style="flex:1">Para tener OMA como app: toca <b>Compartir</b> y luego <b>Agregar a pantalla de inicio</b>.</div>
+      <button onclick="cerrarBannerInstalar()" aria-label="Cerrar">×</button></div>`);
 }
 function cerrarBannerInstalar(){
   DB.save("instalarOcultoHasta", Date.now()+14*24*60*60*1000);
@@ -1075,25 +1204,27 @@ function cerrarBannerInstalar(){
 }
 
 /* ---------- tema ---------- */
-function aplicaTema(){ document.documentElement.dataset.tema=tema==="oscuro"?"oscuro":"claro";
-  const mt=document.querySelector('meta[name="theme-color"]'); if(mt) mt.content=tema==="oscuro"?"#12100D":"#FAF8F3"; }
+function aplicaTema(){
+  document.documentElement.dataset.tema=tema==="oscuro"?"oscuro":"claro";
+  const mt=document.querySelector('meta[name="theme-color"]'); if(mt) mt.content=tema==="oscuro"?"#191919":"#F7F3ED";
+}
 function toggleTema(){ tema=tema==="claro"?"oscuro":"claro"; DB.save("tema",tema); aplicaTema(); render(); }
 
 /* ---------- arranque ---------- */
-window.addEventListener("scroll",()=>{ $("topbar")&&$("topbar").classList.toggle("linea",window.scrollY>8); });
+limpiaEstado();
+window.addEventListener("scroll",()=>{ const t=$("topbar"); if(t&&t.classList) t.classList.toggle("linea",window.scrollY>8); },{passive:true});
 document.addEventListener("DOMContentLoaded",()=>{
-  aplicaTema(); pintaWaFloat(); cargarCatalogo(); cargaPromos(); procesaRetornoMP();
+  aplicaTema(); pintaAviso(); pintaWaFloat(); cargarCatalogo(); cargaPromos(); procesaRetornoMP(); procesaEnlaceEntrada();
+  const directo = vista!=="home";                       // quien llega a una prenda o del pago no espera
   setTimeout(()=>{
-    $("splash").classList.add("out");
-    setTimeout(()=>{
-      $("splash").style.display="none";
-      $("app").classList.add("show"); render(); pintaBannerInstalar();
-    },430);
-  },1500);
+    const s=$("splash"); if(s) s.classList.add("out");
+    $("app").classList.add("show"); render(); pintaBannerInstalar();
+    setTimeout(()=>{ if(s) s.style.display="none"; },520);
+  }, directo?0:650);
 });
 
-/* acceso de diagnóstico/pruebas */
-Object.defineProperty(window,"__roma",{value:{
+/* acceso de diagnóstico y pruebas */
+const DIAG={
   get carrito(){return carrito}, set carrito(v){carrito=v},
   get looks(){return looks}, get ordenes(){return ordenes}, get puntos(){return puntos},
   get codigoAplicado(){return codigoAplicado}, set codigoAplicado(v){codigoAplicado=v},
@@ -1101,4 +1232,6 @@ Object.defineProperty(window,"__roma",{value:{
   get entrega(){return entrega}, set entrega(v){entrega=v},
   set catFiltro(v){catFiltro=v}, set filtroColor(v){filtroColor=v}, set filtroTalla(v){filtroTalla=v},
   totales, cartCount, DB
-}});
+};
+Object.defineProperty(window,"__oma",{value:DIAG});
+Object.defineProperty(window,"__roma",{value:DIAG});

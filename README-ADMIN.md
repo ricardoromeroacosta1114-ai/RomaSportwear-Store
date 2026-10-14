@@ -1,31 +1,32 @@
-# ROMA Sportwear — Guía rápida del administrador
+# OMA Sportwear — Guía rápida del administrador
 
-## Entrar al administrador
-App → Perfil → **Administrador ROMA** → correo y contraseña (el usuario que creaste en Supabase → Authentication → Users).
+## Entrar
 
-## Conectar Supabase (una sola vez)
-1. Cuenta gratis en supabase.com → New project.
-2. SQL Editor → pega `setup-supabase.sql` → Run.
-3. Authentication → Users → Add user (tu correo/contraseña de admin).
-4. Settings → API → copia **Project URL** y **anon public key** → pégalos en `config.js` → vuelve a subir el sitio a Netlify.
+Abre una vez `https://<sitio>/?admin=1`. Después: Cuenta → **Administrador** → correo y contraseña (el usuario creado en Supabase → Authentication → Users). Las clientas nunca ven esa opción.
 
-## Agregar productos e imágenes
-Administrador → **+ Agregar producto** → llena nombre, precio, color, tallas/existencias, relación con el armador → **Subir imágenes** (se guardan en Supabase Storage) → ★ marca la principal, ◀▶ ordena, ✕ elimina → **Guardar**. Los cambios aparecen a todas las clientas al recargar la tienda.
+## Qué se cambia desde ahí
 
-## Editar configuración
-Administrador → sección **Configuración de la tienda**: WhatsApp, dirección de recolección, costos de entrega (local/nacional), envío gratis desde, % descuento por outfit, horarios, datos de transferencia, redes. **Guardar configuración**. (Los valores por defecto viven en `config.js`.)
+- **Configuración de la tienda**: WhatsApp, lugar y horario de recolección, costo de entrega local y de envío nacional, monto para envío gratis, porcentaje de descuento del outfit, datos de transferencia, pago con tarjeta encendido o apagado, programa de puntos.
+- **Códigos de descuento**: crear, encender y apagar. El servidor vuelve a validar cada código al cobrar.
+- **Inventario en vivo**: la casilla que hace que la tienda lea las existencias del punto de venta. Antes de marcarla hay que seguir `CONEXION-INVENTARIO.md`.
+
+## Qué ya no se cambia desde ahí
+
+**Prendas, colores, tallas, precios y existencias.** Vienen del inventario del punto de venta, para que el bazar y la web no digan cosas distintas. Cómo actualizarlos: `DEPLOY.md`, sección 4.
+
+## El descuento del outfit
+
+Con una jacket o una playera, más un legging, el outfit lleva el porcentaje configurado. Desde el armador se aplica solo; en la bolsa también se puede escribir el código `OUTFIT` (el anterior, `LOOK15`, sigue funcionando).
 
 ## Probar un pedido
-Tienda → agrega prendas (exige talla) → Carrito → método de entrega → Checkout → llena datos → **Enviar pedido por WhatsApp** → se abre WhatsApp con el mensaje al 526633183894 → presiona enviar.
 
-## Variables de entorno necesarias
-Hoy: ninguna en Netlify. Solo `SUPABASE_URL` y `SUPABASE_ANON_KEY` dentro de `config.js` (la anon key es pública por diseño; la seguridad la dan las políticas RLS del SQL).
+Tienda → elige prenda y talla → Bolsa → forma de entrega → Pago → llena los datos.
 
-## Activar Mercado Pago (pago con tarjeta)
-El checkout y la función que crean la preferencia de pago (`netlify/functions/create-preference.js`) ya están implementados. Para activarlo:
-1. Consigue tu **Access Token** en el panel de Mercado Pago Developers (mercadopago.com.mx → Developers → Tus integraciones). Empieza con las credenciales de **prueba** antes que las de producción.
-2. En Netlify: Site settings → Environment variables → agrega `MP_ACCESS_TOKEN` (el token es secreto y NUNCA debe ir en el repo ni en `config.js`).
-3. Activa el checkbox "Activar pago con tarjeta (Mercado Pago)" en Administrador → Configuración de la tienda (o pon `mercadoPagoEnabled: true` en `config.js`).
-4. Prueba el flujo completo con una tarjeta de prueba antes de cambiar a credenciales de producción.
+- **WhatsApp, transferencia o efectivo**: se abre WhatsApp con el pedido escrito. Los datos para transferir aparecen solo después de crear el pedido.
+- **Tarjeta**: abre Mercado Pago. Si el pago se rechaza, la bolsa queda intacta para reintentar.
 
-Nota: la confirmación de pago se basa en los parámetros de la URL de retorno de Mercado Pago (`?mp=approved|pending|failure`), revisados junto con el aviso manual por WhatsApp antes de preparar el pedido. Para mayor robustez a futuro se puede agregar un webhook que verifique el pago directamente contra la API de Mercado Pago.
+## Pago con tarjeta (Mercado Pago)
+
+El token vive únicamente en Netlify, en la variable `MP_ACCESS_TOKEN`; nunca en el código del sitio. Al banco se le pide que el cargo aparezca como «OMA SPORTWEAR» en el estado de cuenta de la clienta.
+
+La tienda confirma un pago de dos maneras: al volver la clienta de Mercado Pago, y con el aviso que Mercado Pago manda directo al servidor (`netlify/functions/mp-aviso.js`), que no depende de que ella regrese. Ese aviso es el que registra la venta en el inventario cuando la conexión en vivo está encendida.
