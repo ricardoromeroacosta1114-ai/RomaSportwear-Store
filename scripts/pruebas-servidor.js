@@ -75,6 +75,11 @@ const cobrado = p => p.items.reduce((s, i) => s + i.unit_price * i.quantity, 0);
   const outfit = [{ sku: "JACKET-NEGRO-M", cant: 1 }, { sku: "LEGGING-CAMPANA-NEGRO-M", cant: 1 }];
   r = await pide({ folio: "OMA-20261013-1004", entrega: "pickup", codigo: "OUTFIT", items: outfit });
   chk("OUTFIT: 10 % sobre jacket + legging", r.total === 477, r.total);
+  chk("a Mercado Pago le llega el importe ya rebajado, sin precios negativos", cobrado(ultima()) === 477 && ultima().items.every(i => i.unit_price > 0),
+    JSON.stringify(ultima().items.map(i => i.unit_price)));
+  chk("y el renglón dice qué prendas son", /Jacket negro, talla M \+ Legging Campana negro, talla M/.test(ultima().items[0].title), ultima().items[0].title);
+  r = await pide({ folio: "OMA-20261013-1104", entrega: "local", codigo: "OUTFIT", items: [{ sku: "PLAYERA-NEGRO-S", cant: 1 }, { sku: "LEGGING-CAMPANA-NEGRO-M", cant: 1 }] });
+  chk("con descuento y entrega: 430 − 43 + 100", r.total === 487 && cobrado(ultima()) === 487, r.total);
   r = await pide({ folio: "OMA-20261013-1005", entrega: "pickup", codigo: "look15", items: outfit });
   chk("el código viejo LOOK15 vale lo mismo", r.total === 477, r.total);
   r = await pide({ folio: "OMA-20261013-1006", entrega: "pickup", codigo: "OUTFIT", items: [{ sku: "JACKET-NEGRO-M", cant: 1 }, { sku: "PLAYERA-NEGRO-S", cant: 1 }] });

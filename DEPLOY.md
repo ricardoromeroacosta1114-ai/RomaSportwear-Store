@@ -25,7 +25,7 @@ El pago con tarjeta no funciona en local (necesita las funciones de Netlify): se
 
 ```
 node scripts/pruebas.js            la tienda (75 comprobaciones)
-node scripts/pruebas-servidor.js   cobro y aviso de pago (39 comprobaciones)
+node scripts/pruebas-servidor.js   cobro y aviso de pago (42 comprobaciones)
 node herramientas/capturas.js <carpeta> movil|escritorio claro|oscuro
 ```
 

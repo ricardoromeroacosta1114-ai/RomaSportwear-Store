@@ -36,12 +36,15 @@ exports.handler = async (event) => {
   const sitio = "https://" + (event.headers["x-forwarded-host"] || event.headers.host);
   const volver = est => sitio + "/?mp=" + est + "&folio=" + encodeURIComponent(folio);
 
-  /* Los renglones reales, para que la clienta vea su desglose en Mercado Pago. */
-  const mpItems = v.items.map(i => ({
-    id: i.sku, title: i.nombre + " " + String(i.color).toLowerCase() + ", talla " + i.talla,
-    quantity: i.cant, unit_price: i.precio, currency_id: "MXN", category_id: "fashion"
-  }));
-  if (t.desc > 0) mpItems.push({ title: "Descuento " + (t.etiqueta || ""), quantity: 1, unit_price: -t.desc, currency_id: "MXN" });
+  /* Los renglones reales, para que la clienta vea su desglose en Mercado Pago.
+     Con descuento va un solo renglón con el importe ya rebajado: Mercado Pago
+     no admite renglones con precio negativo y así el total cuadra al centavo. */
+  const nombreDe = i => i.nombre + " " + String(i.color).toLowerCase() + ", talla " + i.talla;
+  const mpItems = t.desc > 0
+    ? [{ id: folio, title: ("OMA: " + v.items.map(i => (i.cant > 1 ? i.cant + " × " : "") + nombreDe(i)).join(" + ")).slice(0, 250),
+         description: "Incluye descuento " + (t.etiqueta || "") + " de $" + t.desc.toFixed(2),
+         quantity: 1, unit_price: Math.round((t.sub - t.desc) * 100) / 100, currency_id: "MXN", category_id: "fashion" }]
+    : v.items.map(i => ({ id: i.sku, title: nombreDe(i), quantity: i.cant, unit_price: i.precio, currency_id: "MXN", category_id: "fashion" }));
   if (t.envio > 0) mpItems.push({ title: "Entrega", quantity: 1, unit_price: t.envio, currency_id: "MXN" });
 
   const preference = {

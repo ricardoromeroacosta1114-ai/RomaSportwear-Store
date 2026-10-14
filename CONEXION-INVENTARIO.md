@@ -45,7 +45,7 @@ Todo esto ya está programado y probado en un Postgres local con la mercancía r
 |---|---|---|
 | Puente tienda ↔ inventario | `roma-inventario`: `node pruebas/tienda-web.mjs` | 32 de 32 |
 | Sistema de inventario completo | `roma-inventario`: `node pruebas/base.mjs` | 113 de 113 |
-| Cobro y aviso de pago | aquí: `node scripts/pruebas-servidor.js` | 39 de 39 |
+| Cobro y aviso de pago | aquí: `node scripts/pruebas-servidor.js` | 42 de 42 |
 
 ## Pasos para encenderlo
 
